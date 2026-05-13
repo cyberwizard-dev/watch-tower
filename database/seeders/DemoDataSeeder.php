@@ -366,32 +366,91 @@ class DemoDataSeeder extends Seeder
      */
     private function seedQueries(Project $project, array $traces): void
     {
-        $queries = [
-            'SELECT * FROM users WHERE id = ?',
-            'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC',
-            'UPDATE orders SET status = ? WHERE id = ?',
-            'INSERT INTO sessions (id, user_id, payload) VALUES (?, ?, ?)',
-            'SELECT count(*) FROM notifications WHERE user_id = ? AND read_at IS NULL',
+        /** @var list<array{sql:string,type:string,connection:string,weight:int,base_ms:float,jitter_ms:float}> $templates */
+        $templates = [
+            ['sql' => 'select * from `users` where `id` = ? limit 1', 'type' => 'select', 'connection' => 'mysql', 'weight' => 220, 'base_ms' => 0.6, 'jitter_ms' => 0.6],
+            ['sql' => 'select * from `users` where `email` = ? limit 1', 'type' => 'select', 'connection' => 'mysql', 'weight' => 80, 'base_ms' => 0.8, 'jitter_ms' => 0.6],
+            ['sql' => 'select `id`, `name`, `email` from `users` where `organization_id` = ? order by `name` asc', 'type' => 'select', 'connection' => 'mysql', 'weight' => 30, 'base_ms' => 1.4, 'jitter_ms' => 0.9],
+            ['sql' => 'select count(*) as aggregate from `users` where `organization_id` = ? and `deleted_at` is null', 'type' => 'select', 'connection' => 'mysql', 'weight' => 25, 'base_ms' => 1.1, 'jitter_ms' => 0.7],
+            ['sql' => 'update `users` set `last_seen_at` = ?, `updated_at` = ? where `id` = ?', 'type' => 'update', 'connection' => 'mysql', 'weight' => 60, 'base_ms' => 1.5, 'jitter_ms' => 1.2],
+            ['sql' => 'select * from `organizations` where `slug` = ? limit 1', 'type' => 'select', 'connection' => 'mysql', 'weight' => 95, 'base_ms' => 0.7, 'jitter_ms' => 0.5],
+            ['sql' => 'select * from `projects` where `organization_id` = ? order by `created_at` desc', 'type' => 'select', 'connection' => 'mysql', 'weight' => 55, 'base_ms' => 1.3, 'jitter_ms' => 0.8],
+            ['sql' => 'select `projects`.*, (select count(*) from `error_groups` where `projects`.`id` = `error_groups`.`project_id` and `error_groups`.`status` = ?) as `open_issues` from `projects` where `slug` = ? limit 1', 'type' => 'select', 'connection' => 'mysql', 'weight' => 70, 'base_ms' => 2.4, 'jitter_ms' => 2.6],
+            ['sql' => 'select * from `error_groups` where `project_id` = ? and `status` = ? order by `last_occurrence_at` desc limit 25 offset ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 50, 'base_ms' => 2.1, 'jitter_ms' => 1.8],
+            ['sql' => 'select count(*) as aggregate from `error_groups` where `project_id` = ? and `status` = ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 35, 'base_ms' => 1.2, 'jitter_ms' => 0.8],
+            ['sql' => 'select * from `error_occurrences` where `error_group_id` = ? order by `occurred_at` desc limit 1', 'type' => 'select', 'connection' => 'mysql', 'weight' => 65, 'base_ms' => 1.8, 'jitter_ms' => 1.5],
+            ['sql' => 'select `environment`, count(*) as `total` from `error_occurrences` where `error_group_id` = ? group by `environment`', 'type' => 'select', 'connection' => 'mysql', 'weight' => 25, 'base_ms' => 2.6, 'jitter_ms' => 2.4],
+            ['sql' => 'insert into `error_occurrences` (`error_group_id`, `project_id`, `message`, `file`, `line`, `stacktrace`, `context`, `environment`, `occurred_at`, `created_at`, `updated_at`) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'type' => 'insert', 'connection' => 'mysql', 'weight' => 30, 'base_ms' => 3.2, 'jitter_ms' => 2.5],
+            ['sql' => 'update `error_groups` set `total_count` = `total_count` + 1, `last_occurrence_at` = ?, `updated_at` = ? where `id` = ?', 'type' => 'update', 'connection' => 'mysql', 'weight' => 35, 'base_ms' => 2.1, 'jitter_ms' => 1.6],
+            ['sql' => 'select * from `traces` where `project_id` = ? and `occurred_at` between ? and ? order by `occurred_at` desc limit ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 40, 'base_ms' => 4.6, 'jitter_ms' => 6.5],
+            ['sql' => 'select `bucket`, count(*) as `total` from `traces` where `project_id` = ? and `occurred_at` between ? and ? group by `bucket` order by `bucket` asc', 'type' => 'select', 'connection' => 'mysql', 'weight' => 18, 'base_ms' => 7.3, 'jitter_ms' => 9.8],
+            ['sql' => 'select avg(`duration_ms`) as `avg`, max(`duration_ms`) as `max` from `traces` where `project_id` = ? and `occurred_at` between ? and ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 15, 'base_ms' => 6.2, 'jitter_ms' => 8.1],
+            ['sql' => 'select * from `queue_job_runs` where `project_id` = ? and `status` = ? order by `dispatched_at` desc limit ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 30, 'base_ms' => 1.7, 'jitter_ms' => 1.3],
+            ['sql' => 'update `queue_job_runs` set `status` = ?, `completed_at` = ?, `duration_ms` = ?, `updated_at` = ? where `id` = ?', 'type' => 'update', 'connection' => 'mysql', 'weight' => 22, 'base_ms' => 1.4, 'jitter_ms' => 0.9],
+            ['sql' => 'insert into `queue_job_runs` (`id`, `project_id`, `job_class`, `queue`, `connection`, `payload`, `status`, `dispatched_at`, `created_at`, `updated_at`) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'type' => 'insert', 'connection' => 'mysql', 'weight' => 28, 'base_ms' => 2.1, 'jitter_ms' => 1.5],
+            ['sql' => 'select * from `command_runs` where `project_id` = ? and `command` = ? order by `occurred_at` desc limit ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 14, 'base_ms' => 1.6, 'jitter_ms' => 1.1],
+            ['sql' => 'select * from `scheduled_task_runs` where `project_id` = ? and `task_hash` = ? order by `occurred_at` desc', 'type' => 'select', 'connection' => 'mysql', 'weight' => 12, 'base_ms' => 1.5, 'jitter_ms' => 1.0],
+            ['sql' => 'select * from `sessions` where `id` = ? limit 1', 'type' => 'select', 'connection' => 'mysql', 'weight' => 110, 'base_ms' => 0.5, 'jitter_ms' => 0.3],
+            ['sql' => 'update `sessions` set `payload` = ?, `last_activity` = ? where `id` = ?', 'type' => 'update', 'connection' => 'mysql', 'weight' => 95, 'base_ms' => 0.9, 'jitter_ms' => 0.4],
+            ['sql' => 'insert into `sessions` (`id`, `user_id`, `payload`, `last_activity`) values (?, ?, ?, ?)', 'type' => 'insert', 'connection' => 'mysql', 'weight' => 18, 'base_ms' => 1.1, 'jitter_ms' => 0.5],
+            ['sql' => 'delete from `sessions` where `last_activity` < ?', 'type' => 'delete', 'connection' => 'mysql', 'weight' => 4, 'base_ms' => 5.2, 'jitter_ms' => 3.6],
+            ['sql' => 'select * from `cache` where `key` = ? and `expiration` > ? limit 1', 'type' => 'select', 'connection' => 'mysql', 'weight' => 75, 'base_ms' => 0.4, 'jitter_ms' => 0.3],
+            ['sql' => 'insert into `cache` (`key`, `value`, `expiration`) values (?, ?, ?) on duplicate key update `value` = values(`value`), `expiration` = values(`expiration`)', 'type' => 'insert', 'connection' => 'mysql', 'weight' => 42, 'base_ms' => 0.9, 'jitter_ms' => 0.5],
+            ['sql' => 'select count(*) as aggregate from `notifications` where `user_id` = ? and `read_at` is null', 'type' => 'select', 'connection' => 'mysql', 'weight' => 48, 'base_ms' => 0.9, 'jitter_ms' => 0.6],
+            ['sql' => 'select * from `notifications` where `user_id` = ? order by `created_at` desc limit ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 32, 'base_ms' => 1.4, 'jitter_ms' => 1.1],
+            ['sql' => 'update `notifications` set `read_at` = ?, `updated_at` = ? where `id` = ?', 'type' => 'update', 'connection' => 'mysql', 'weight' => 16, 'base_ms' => 1.0, 'jitter_ms' => 0.7],
+            ['sql' => 'select * from `orders` where `user_id` = ? order by `created_at` desc', 'type' => 'select', 'connection' => 'mysql', 'weight' => 38, 'base_ms' => 2.5, 'jitter_ms' => 2.1],
+            ['sql' => 'select `orders`.*, `users`.`email` from `orders` inner join `users` on `orders`.`user_id` = `users`.`id` where `orders`.`id` = ? limit 1', 'type' => 'select', 'connection' => 'mysql', 'weight' => 26, 'base_ms' => 2.8, 'jitter_ms' => 1.9],
+            ['sql' => 'update `orders` set `status` = ?, `updated_at` = ? where `id` = ?', 'type' => 'update', 'connection' => 'mysql', 'weight' => 20, 'base_ms' => 1.6, 'jitter_ms' => 0.9],
+            ['sql' => 'insert into `orders` (`user_id`, `total`, `currency`, `status`, `created_at`, `updated_at`) values (?, ?, ?, ?, ?, ?)', 'type' => 'insert', 'connection' => 'mysql', 'weight' => 18, 'base_ms' => 2.2, 'jitter_ms' => 1.5],
+            ['sql' => 'select * from `order_items` where `order_id` = ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 36, 'base_ms' => 1.7, 'jitter_ms' => 1.2],
+            ['sql' => 'select `products`.* from `products` where `products`.`id` in (?, ?, ?, ?)', 'type' => 'select', 'connection' => 'mysql', 'weight' => 28, 'base_ms' => 1.9, 'jitter_ms' => 1.3],
+            ['sql' => 'select * from `products` where `slug` = ? limit 1', 'type' => 'select', 'connection' => 'mysql', 'weight' => 70, 'base_ms' => 0.9, 'jitter_ms' => 0.5],
+            ['sql' => 'select * from `inventory` where `product_id` = ? and `warehouse_id` = ? for update', 'type' => 'select', 'connection' => 'mysql', 'weight' => 10, 'base_ms' => 6.8, 'jitter_ms' => 9.2],
+            ['sql' => 'update `inventory` set `quantity` = `quantity` - ?, `updated_at` = ? where `product_id` = ? and `warehouse_id` = ?', 'type' => 'update', 'connection' => 'mysql', 'weight' => 8, 'base_ms' => 4.1, 'jitter_ms' => 5.6],
+            ['sql' => 'select * from `audit_logs` where `subject_type` = ? and `subject_id` = ? order by `created_at` desc limit ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 14, 'base_ms' => 8.7, 'jitter_ms' => 12.1],
+            ['sql' => 'insert into `audit_logs` (`user_id`, `subject_type`, `subject_id`, `event`, `properties`, `created_at`) values (?, ?, ?, ?, ?, ?)', 'type' => 'insert', 'connection' => 'mysql', 'weight' => 20, 'base_ms' => 2.4, 'jitter_ms' => 1.7],
+            ['sql' => 'select * from `webhooks` where `project_id` = ? and `is_active` = ?', 'type' => 'select', 'connection' => 'mysql', 'weight' => 16, 'base_ms' => 0.8, 'jitter_ms' => 0.4],
+            ['sql' => 'insert into `webhook_deliveries` (`webhook_id`, `payload`, `status`, `attempt`, `created_at`) values (?, ?, ?, ?, ?)', 'type' => 'insert', 'connection' => 'mysql', 'weight' => 14, 'base_ms' => 1.4, 'jitter_ms' => 0.9],
+            ['sql' => 'select * from `feature_flags` where `key` = ? limit 1', 'type' => 'select', 'connection' => 'redis', 'weight' => 200, 'base_ms' => 0.2, 'jitter_ms' => 0.1],
+            ['sql' => 'select * from `rate_limits` where `bucket` = ? and `period_start` >= ?', 'type' => 'select', 'connection' => 'redis', 'weight' => 140, 'base_ms' => 0.3, 'jitter_ms' => 0.2],
+            ['sql' => 'incr `rate_limits:?:?`', 'type' => 'update', 'connection' => 'redis', 'weight' => 140, 'base_ms' => 0.2, 'jitter_ms' => 0.1],
+            ['sql' => 'select `id`, `email` from `analytics`.`events` where `event` = ? and `created_at` between ? and ? order by `created_at` desc limit ?', 'type' => 'select', 'connection' => 'analytics', 'weight' => 9, 'base_ms' => 18.4, 'jitter_ms' => 24.6],
+            ['sql' => 'select sum(`amount`) as `total` from `analytics`.`revenue_daily` where `tenant_id` = ? and `day` between ? and ?', 'type' => 'select', 'connection' => 'analytics', 'weight' => 7, 'base_ms' => 14.6, 'jitter_ms' => 18.2],
         ];
 
-        $rows = [];
+        $weightedIndex = $this->buildWeightedIndex($templates);
+
+        $tracesByHour = [];
         foreach ($traces as $trace) {
-            $count = (int) $trace['db_queries_count'];
-            for ($i = 0; $i < $count; $i++) {
-                $sql = $queries[array_rand($queries)];
-                $duration = random_int(1, 220) / 10;
+            $hour = substr((string) $trace['occurred_at'], 0, 13);
+            $tracesByHour[$hour][] = $trace;
+        }
+
+        $rows = [];
+        foreach ($templates as $template) {
+            $totalCalls = max(1, (int) ($template['weight'] * random_int(7, 12)));
+
+            for ($i = 0; $i < $totalCalls; $i++) {
+                $trace = $traces[array_rand($traces)];
+
+                $duration = $template['base_ms'] + (random_int(0, (int) ($template['jitter_ms'] * 100)) / 100);
+                if (random_int(1, 50) === 1) {
+                    $duration *= random_int(3, 12);
+                }
+
                 $rows[] = [
                     'id' => (string) Str::uuid(),
                     'project_id' => $project->id,
                     'trace_id' => $trace['id'],
-                    'query_type' => str_starts_with($sql, 'SELECT') ? 'select' : (str_starts_with($sql, 'INSERT') ? 'insert' : 'update'),
-                    'sql' => $sql,
+                    'query_type' => $template['type'],
+                    'sql' => $template['sql'],
                     'bindings' => json_encode([]),
-                    'connection_name' => 'mysql',
-                    'duration_ms' => $duration,
-                    'row_count' => random_int(0, 50),
-                    'is_n_plus_one' => $count > 12,
-                    'is_slow' => $duration > 15,
+                    'connection_name' => $template['connection'],
+                    'duration_ms' => round($duration, 3),
+                    'row_count' => $template['type'] === 'select' ? random_int(0, 50) : null,
+                    'is_n_plus_one' => $totalCalls > 1200 && random_int(1, 4) === 1,
+                    'is_slow' => $duration > 25,
                     'occurred_at' => $trace['occurred_at'],
                     'created_at' => $trace['occurred_at'],
                     'updated_at' => $trace['occurred_at'],
@@ -404,9 +463,55 @@ class DemoDataSeeder extends Seeder
             }
         }
 
+        // Filler queries to populate the long tail (low-weight templates picked at random).
+        $filler = max(0, 800 - count($rows));
+        for ($i = 0; $i < $filler; $i++) {
+            $template = $templates[$weightedIndex[array_rand($weightedIndex)]];
+            $trace = $traces[array_rand($traces)];
+            $duration = $template['base_ms'] + (random_int(0, (int) ($template['jitter_ms'] * 100)) / 100);
+
+            $rows[] = [
+                'id' => (string) Str::uuid(),
+                'project_id' => $project->id,
+                'trace_id' => $trace['id'],
+                'query_type' => $template['type'],
+                'sql' => $template['sql'],
+                'bindings' => json_encode([]),
+                'connection_name' => $template['connection'],
+                'duration_ms' => round($duration, 3),
+                'row_count' => $template['type'] === 'select' ? random_int(0, 50) : null,
+                'is_n_plus_one' => false,
+                'is_slow' => $duration > 25,
+                'occurred_at' => $trace['occurred_at'],
+                'created_at' => $trace['occurred_at'],
+                'updated_at' => $trace['occurred_at'],
+            ];
+
+            if (count($rows) >= 500) {
+                TraceQuery::query()->insert($rows);
+                $rows = [];
+            }
+        }
+
         if ($rows !== []) {
             TraceQuery::query()->insert($rows);
         }
+    }
+
+    /**
+     * @param  list<array{weight:int}>  $templates
+     * @return list<int>
+     */
+    private function buildWeightedIndex(array $templates): array
+    {
+        $index = [];
+        foreach ($templates as $i => $template) {
+            for ($j = 0; $j < $template['weight']; $j++) {
+                $index[] = $i;
+            }
+        }
+
+        return $index;
     }
 
     private function seedJobs(Project $project, CarbonImmutable $start): void

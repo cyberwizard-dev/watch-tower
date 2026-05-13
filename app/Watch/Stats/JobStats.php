@@ -6,9 +6,41 @@ use App\Models\Project;
 use App\Models\QueueJobRun;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class JobStats
 {
+    /**
+     * @return LengthAwarePaginator<array-key, array{job_class:string,queued:int,processed:int,released:int,failed:int,total:int,avg_ms:float|null,p95_ms:float|null}>
+     */
+    public function paginatedJobs(
+        Project $project,
+        TimeRange $range,
+        ?string $search,
+        ?string $sort,
+        ?string $dir,
+        int $page,
+        int $perPage,
+    ): LengthAwarePaginator {
+        return StatsPaginator::paginate(
+            items: $this->jobs($project, $range, $search),
+            sortable: [
+                'job_class' => 'string',
+                'queued' => 'numeric',
+                'processed' => 'numeric',
+                'released' => 'numeric',
+                'failed' => 'numeric',
+                'total' => 'numeric',
+                'avg_ms' => 'numeric',
+                'p95_ms' => 'numeric',
+            ],
+            sort: $sort ?? 'job_class',
+            dir: $dir ?? 'asc',
+            page: $page,
+            perPage: $perPage,
+        );
+    }
+
     /**
      * @return array{
      *   totals: array{total:int,queued:int,processed:int,released:int,failed:int},

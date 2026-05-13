@@ -1,9 +1,10 @@
 import { Link, router } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, Search, Users } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { PageHeader } from '@/components/page-header';
+import { Pagination } from '@/components/pagination';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { AppLayout } from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import jobsRoutes from '@/routes/projects/jobs';
+import type { Paginated } from '@/types/pagination';
 
 type SummaryBucket = {
     bucket: string;
@@ -47,9 +49,9 @@ type JobRow = {
 
 type Props = {
     summary: Summary;
-    jobs: JobRow[];
+    jobs: Paginated<JobRow>;
     selectedRange: string;
-    filters: { search: string | null };
+    filters: { search: string | null; sort: SortKey; dir: SortDir };
 };
 
 type SortKey = 'job_class' | 'queued' | 'processed' | 'released' | 'failed' | 'total' | 'avg_ms' | 'p95_ms';
@@ -57,43 +59,29 @@ type SortDir = 'asc' | 'desc';
 
 export default function JobsIndex({ summary, jobs, selectedRange, filters }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
-    const [sortKey, setSortKey] = useState<SortKey>('job_class');
-    const [sortDir, setSortDir] = useState<SortDir>('asc');
+    const sortKey = filters.sort;
+    const sortDir = filters.dir;
 
-    const sortedJobs = useMemo(() => {
-        const copy = [...jobs];
-        copy.sort((a, b) => {
-            const av = a[sortKey];
-            const bv = b[sortKey];
-            if (av === null && bv === null) return 0;
-            if (av === null) return 1;
-            if (bv === null) return -1;
-            if (typeof av === 'number' && typeof bv === 'number') {
-                return sortDir === 'asc' ? av - bv : bv - av;
+    const visit = (params: Record<string, string | number | null>) => {
+        const url = new URL(window.location.href);
+        for (const [key, value] of Object.entries(params)) {
+            if (value === null || value === '') {
+                url.searchParams.delete(key);
+            } else {
+                url.searchParams.set(key, String(value));
             }
-            return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-        });
-        return copy;
-    }, [jobs, sortKey, sortDir]);
+        }
+        router.visit(url.pathname + url.search, { preserveScroll: true, preserveState: true });
+    };
 
     const toggleSort = (key: SortKey) => {
-        if (sortKey === key) {
-            setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortKey(key);
-            setSortDir(key === 'job_class' ? 'asc' : 'desc');
-        }
+        const nextDir: SortDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : key === 'job_class' ? 'asc' : 'desc';
+        visit({ sort: key, dir: nextDir, page: null });
     };
 
     const onSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const url = new URL(window.location.href);
-        if (search) {
-            url.searchParams.set('search', search);
-        } else {
-            url.searchParams.delete('search');
-        }
-        router.visit(url.pathname + url.search, { preserveScroll: true, preserveState: true });
+        visit({ search: search || null, page: null });
     };
 
     return (
@@ -125,7 +113,7 @@ export default function JobsIndex({ summary, jobs, selectedRange, filters }: Pro
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle>{sortedJobs.length} Jobs</CardTitle>
+                        <CardTitle>{jobs.total.toLocaleString()} Jobs</CardTitle>
                         <form onSubmit={onSearchSubmit} className="relative w-64">
                             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                             <Input
@@ -153,19 +141,20 @@ export default function JobsIndex({ summary, jobs, selectedRange, filters }: Pro
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {sortedJobs.length === 0 ? (
+                                {jobs.data.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
                                             No jobs captured in {selectedRange.toUpperCase()}
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    sortedJobs.map((row) => (
+                                    jobs.data.map((row) => (
                                         <JobRowTr key={row.job_class} row={row} />
                                     ))
                                 )}
                             </TableBody>
                         </Table>
+                        <Pagination links={jobs.links} from={jobs.from} to={jobs.to} total={jobs.total} />
                     </CardContent>
                 </Card>
             </div>

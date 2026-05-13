@@ -16,13 +16,18 @@ class ScheduledTasksController extends Controller
     {
         $range = TimeRange::fromLabel($request->string('range', '1h')->toString());
         $search = trim($request->string('search')->toString()) ?: null;
+        $sort = $request->string('sort')->toString() ?: null;
+        $dir = $request->string('dir')->toString() ?: null;
+        $page = max(1, (int) $request->integer('page', 1));
 
         return Inertia::render('projects/scheduled-tasks/index', [
             'summary' => $stats->summary($project, $range),
-            'tasks' => $stats->tasks($project, $range, $search),
+            'tasks' => $stats->paginatedTasks($project, $range, $search, $sort, $dir, $page, 25),
             'selectedRange' => $range->label,
             'filters' => [
                 'search' => $search,
+                'sort' => $sort ?? 'task',
+                'dir' => $dir ?? 'asc',
             ],
         ]);
     }

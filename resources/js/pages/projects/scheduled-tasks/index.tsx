@@ -1,6 +1,6 @@
 import { Link, router } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, ExternalLink, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
     Bar,
     BarChart,
@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 
 import { PageHeader } from '@/components/page-header';
+import { Pagination } from '@/components/pagination';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -21,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { AppLayout } from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import scheduledTasksRoutes from '@/routes/projects/scheduled-tasks';
+import type { Paginated } from '@/types/pagination';
 
 type SummaryBucket = {
     bucket: string;
@@ -58,9 +60,9 @@ type TaskRow = {
 
 type Props = {
     summary: Summary;
-    tasks: TaskRow[];
+    tasks: Paginated<TaskRow>;
     selectedRange: string;
-    filters: { search: string | null };
+    filters: { search: string | null; sort: SortKey; dir: SortDir };
 };
 
 type SortKey = 'task' | 'processed' | 'skipped' | 'failed' | 'total' | 'avg_ms' | 'p95_ms';
@@ -68,43 +70,29 @@ type SortDir = 'asc' | 'desc';
 
 export default function ScheduledTasksIndex({ summary, tasks, selectedRange, filters }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
-    const [sortKey, setSortKey] = useState<SortKey>('task');
-    const [sortDir, setSortDir] = useState<SortDir>('asc');
+    const sortKey = filters.sort;
+    const sortDir = filters.dir;
 
-    const sortedTasks = useMemo(() => {
-        const copy = [...tasks];
-        copy.sort((a, b) => {
-            const av = a[sortKey];
-            const bv = b[sortKey];
-            if (av === null && bv === null) return 0;
-            if (av === null) return 1;
-            if (bv === null) return -1;
-            if (typeof av === 'number' && typeof bv === 'number') {
-                return sortDir === 'asc' ? av - bv : bv - av;
+    const visit = (params: Record<string, string | number | null>) => {
+        const url = new URL(window.location.href);
+        for (const [key, value] of Object.entries(params)) {
+            if (value === null || value === '') {
+                url.searchParams.delete(key);
+            } else {
+                url.searchParams.set(key, String(value));
             }
-            return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-        });
-        return copy;
-    }, [tasks, sortKey, sortDir]);
+        }
+        router.visit(url.pathname + url.search, { preserveScroll: true, preserveState: true });
+    };
 
     const toggleSort = (key: SortKey) => {
-        if (sortKey === key) {
-            setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortKey(key);
-            setSortDir(key === 'task' ? 'asc' : 'desc');
-        }
+        const nextDir: SortDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : key === 'task' ? 'asc' : 'desc';
+        visit({ sort: key, dir: nextDir, page: null });
     };
 
     const onSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const url = new URL(window.location.href);
-        if (search) {
-            url.searchParams.set('search', search);
-        } else {
-            url.searchParams.delete('search');
-        }
-        router.visit(url.pathname + url.search, { preserveScroll: true, preserveState: true });
+        visit({ search: search || null, page: null });
     };
 
     return (
@@ -123,7 +111,7 @@ export default function ScheduledTasksIndex({ summary, tasks, selectedRange, fil
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle>{sortedTasks.length} Tasks</CardTitle>
+                        <CardTitle>{tasks.total.toLocaleString()} Tasks</CardTitle>
                         <form onSubmit={onSearchSubmit} className="relative w-64">
                             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                             <Input
@@ -152,17 +140,18 @@ export default function ScheduledTasksIndex({ summary, tasks, selectedRange, fil
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {sortedTasks.length === 0 ? (
+                                {tasks.data.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
                                             No scheduled tasks captured in {selectedRange.toUpperCase()}
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    sortedTasks.map((row) => <TaskRowTr key={row.task_hash} row={row} />)
+                                    tasks.data.map((row) => <TaskRowTr key={row.task_hash} row={row} />)
                                 )}
                             </TableBody>
                         </Table>
+                        <Pagination links={tasks.links} from={tasks.from} to={tasks.to} total={tasks.total} />
                     </CardContent>
                 </Card>
             </div>

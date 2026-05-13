@@ -6,9 +6,39 @@ use App\Models\CommandRun;
 use App\Models\Project;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class CommandStats
 {
+    /**
+     * @return LengthAwarePaginator<array-key, array{command:string,successful:int,failed:int,total:int,avg_ms:float|null,p95_ms:float|null}>
+     */
+    public function paginatedCommands(
+        Project $project,
+        TimeRange $range,
+        ?string $search,
+        ?string $sort,
+        ?string $dir,
+        int $page,
+        int $perPage,
+    ): LengthAwarePaginator {
+        return StatsPaginator::paginate(
+            items: $this->commands($project, $range, $search),
+            sortable: [
+                'command' => 'string',
+                'successful' => 'numeric',
+                'failed' => 'numeric',
+                'total' => 'numeric',
+                'avg_ms' => 'numeric',
+                'p95_ms' => 'numeric',
+            ],
+            sort: $sort ?? 'command',
+            dir: $dir ?? 'asc',
+            page: $page,
+            perPage: $perPage,
+        );
+    }
+
     /**
      * @return array{
      *   totals: array{total:int,successful:int,failed:int},

@@ -16,13 +16,18 @@ class JobsController extends Controller
     {
         $range = TimeRange::fromLabel($request->string('range', '1h')->toString());
         $search = trim($request->string('search')->toString()) ?: null;
+        $sort = $request->string('sort')->toString() ?: null;
+        $dir = $request->string('dir')->toString() ?: null;
+        $page = max(1, (int) $request->integer('page', 1));
 
         return Inertia::render('projects/jobs/index', [
             'summary' => $stats->summary($project, $range),
-            'jobs' => $stats->jobs($project, $range, $search),
+            'jobs' => $stats->paginatedJobs($project, $range, $search, $sort, $dir, $page, 25),
             'selectedRange' => $range->label,
             'filters' => [
                 'search' => $search,
+                'sort' => $sort ?? 'job_class',
+                'dir' => $dir ?? 'asc',
             ],
         ]);
     }

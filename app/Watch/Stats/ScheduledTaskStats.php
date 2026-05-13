@@ -6,9 +6,40 @@ use App\Models\Project;
 use App\Models\ScheduledTaskRun;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class ScheduledTaskStats
 {
+    /**
+     * @return LengthAwarePaginator<array-key, array{task:string,task_hash:string,schedule:string|null,next_run_at:string|null,processed:int,skipped:int,failed:int,total:int,avg_ms:float|null,p95_ms:float|null}>
+     */
+    public function paginatedTasks(
+        Project $project,
+        TimeRange $range,
+        ?string $search,
+        ?string $sort,
+        ?string $dir,
+        int $page,
+        int $perPage,
+    ): LengthAwarePaginator {
+        return StatsPaginator::paginate(
+            items: $this->tasks($project, $range, $search),
+            sortable: [
+                'task' => 'string',
+                'processed' => 'numeric',
+                'skipped' => 'numeric',
+                'failed' => 'numeric',
+                'total' => 'numeric',
+                'avg_ms' => 'numeric',
+                'p95_ms' => 'numeric',
+            ],
+            sort: $sort ?? 'task',
+            dir: $dir ?? 'asc',
+            page: $page,
+            perPage: $perPage,
+        );
+    }
+
     /**
      * @return array{
      *   totals: array{total:int,processed:int,skipped:int,failed:int},

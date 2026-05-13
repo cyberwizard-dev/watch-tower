@@ -44,7 +44,20 @@
       "Bash(curl -s \"http://127.0.0.1:8765/projects/acme-app/jobs?range=30d\" -o /tmp/lw-jobs-idx.html)",
       "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)",
       "Bash(curl -s -o /tmp/cmds-show.html -w 'HTTP %{http_code}\\\\n' 'http://127.0.0.1:8765/projects/acme-app/commands/backup:daily')",
-      "Bash(curl -s -o /tmp/st-show.html -w 'SHOW HTTP %{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/scheduled-tasks/__TRACKED_VAR__)"
+      "Bash(curl -s -o /tmp/st-show.html -w 'SHOW HTTP %{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/scheduled-tasks/__TRACKED_VAR__)",
+      "Bash(curl -fs http://127.0.0.1:8765/)",
+      "Bash(curl -s -o /tmp/exc-index.html -w \"index=%{http_code}\\\\n\" \"http://127.0.0.1:8765/projects/acme-app/exceptions\")",
+      "Bash(curl -s -o /tmp/exc-show.html -w \"show=%{http_code}\\\\n\" \"http://127.0.0.1:8765/projects/acme-app/exceptions/257cad7d-1f38-4201-9e5e-55d21c9c55ec\")",
+      "Bash(curl -s \"http://127.0.0.1:8765/projects/acme-app/exceptions/00000000-0000-0000-0000-000000000000\" -o /dev/null -w \"%{http_code}\\\\n\")",
+      "mcp__laravel-boost__database-schema",
+      "mcp__laravel-boost__database-query",
+      "Bash(curl -s -o /tmp/q-index.html -w \"index=%{http_code}\\\\n\" \"http://127.0.0.1:8765/projects/acme-app/queries?range=24h\")",
+      "Bash(curl -s -o /dev/null -w \"404-test=%{http_code}\\\\n\" \"http://127.0.0.1:8765/projects/acme-app/queries/0000000000000000000000000000000000000000\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8765)",
+      "Bash(/usr/bin/curl -s \"http://localhost:8765/projects/acme-app/queries?sort=total&dir=asc&page=2\")",
+      "Bash(/usr/bin/grep -oE '\"current_page\":[0-9]+' /tmp/p2.html)",
+      "Bash(/usr/bin/head -1)",
+      "Bash(/usr/bin/grep -oE '\"filters\":\\\\{[^}]+\\\\}' /tmp/p2.html)"
     ],
     "additionalDirectories": [
       "/tmp"

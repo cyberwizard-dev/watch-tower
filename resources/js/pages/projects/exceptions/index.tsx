@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { PartyPopper } from 'lucide-react';
 
 import { PageHeader } from '@/components/page-header';
@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/layouts/app-layout';
+import exceptions from '@/routes/projects/exceptions';
+import type { SharedProps } from '@/types/inertia';
 import type { Paginated } from '@/types/pagination';
 
 type ExceptionRow = {
@@ -36,6 +38,9 @@ const STATUS_TABS = [
 ] as const;
 
 export default function ExceptionsIndex({ groups, filters }: Props) {
+    const { props } = usePage<SharedProps>();
+    const slug = props.currentProject?.slug ?? '';
+
     const onFilter = (value: string) => {
         const url = new URL(window.location.href);
         url.searchParams.set('status', value);
@@ -71,28 +76,33 @@ export default function ExceptionsIndex({ groups, filters }: Props) {
                     ) : (
                         <ul className="divide-y divide-border">
                             {groups.data.map((group) => (
-                                <li key={group.id} className="px-5 py-4 transition-colors hover:bg-muted/40">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-center gap-2 text-xs">
-                                                <Badge variant="destructive" className="font-mono">
-                                                    {shortClass(group.exception_class)}
-                                                </Badge>
-                                                <span className="truncate text-muted-foreground">
-                                                    {group.first_file ?? 'unknown'}
-                                                    {group.first_line ? `:${group.first_line}` : ''}
-                                                </span>
+                                <li key={group.id}>
+                                    <Link
+                                        href={exceptions.show([slug, group.id]).url}
+                                        className="block px-5 py-4 transition-colors hover:bg-muted/40"
+                                    >
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                    <Badge variant="destructive" className="font-mono">
+                                                        {shortClass(group.exception_class)}
+                                                    </Badge>
+                                                    <span className="truncate text-muted-foreground">
+                                                        {group.first_file ?? 'unknown'}
+                                                        {group.first_line ? `:${group.first_line}` : ''}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-1 truncate text-sm font-medium">{group.first_message}</p>
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {group.total_count.toLocaleString()} occurrence
+                                                    {group.total_count === 1 ? '' : 's'}
+                                                    <Separator orientation="vertical" className="mx-2 inline-block h-3 align-middle" />
+                                                    last seen {formatRelative(group.last_occurrence_at)}
+                                                </p>
                                             </div>
-                                            <p className="mt-1 truncate text-sm font-medium">{group.first_message}</p>
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                {group.total_count.toLocaleString()} occurrence
-                                                {group.total_count === 1 ? '' : 's'}
-                                                <Separator orientation="vertical" className="mx-2 inline-block h-3 align-middle" />
-                                                last seen {formatRelative(group.last_occurrence_at)}
-                                            </p>
+                                            <StatusBadge status={group.status} />
                                         </div>
-                                        <StatusBadge status={group.status} />
-                                    </div>
+                                    </Link>
                                 </li>
                             ))}
                         </ul>

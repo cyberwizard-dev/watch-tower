@@ -6,6 +6,7 @@ use App\Http\Controllers\Project\ExceptionsController;
 use App\Http\Controllers\Project\IssuesController;
 use App\Http\Controllers\Project\JobsController;
 use App\Http\Controllers\Project\PlaceholderController;
+use App\Http\Controllers\Project\QueriesController;
 use App\Http\Controllers\Project\RequestsController;
 use App\Http\Controllers\Project\ScheduledTasksController;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,9 @@ Route::scopeBindings()
         Route::get('/dashboard', [DashboardController::class, 'show'])->name('dashboard');
         Route::get('/requests', [RequestsController::class, 'index'])->name('requests.index');
         Route::get('/exceptions', [ExceptionsController::class, 'index'])->name('exceptions.index');
+        Route::get('/exceptions/{exception}', [ExceptionsController::class, 'show'])
+            ->where('exception', '[0-9a-fA-F\-]{36}')
+            ->name('exceptions.show');
         Route::get('/issues', [IssuesController::class, 'index'])->name('issues.index');
         Route::get('/issues/{issue}', [IssuesController::class, 'show'])
             ->whereNumber('issue')
@@ -39,7 +43,11 @@ Route::scopeBindings()
         Route::get('/scheduled-tasks/{task}', [ScheduledTasksController::class, 'show'])
             ->where('task', '[A-Fa-f0-9]{40}')
             ->name('scheduled-tasks.show');
+        Route::get('/queries', [QueriesController::class, 'index'])->name('queries.index');
+        Route::get('/queries/{query}', [QueriesController::class, 'show'])
+            ->where('query', '[A-Fa-f0-9]{40}')
+            ->name('queries.show');
         Route::get('/{section}', PlaceholderController::class)
-            ->where('section', 'events|queries|notifications|logs|cache|gates|views|models|emails|mail|http-client|dumps|redis')
+            ->where('section', 'events|notifications|logs|cache|gates|views|models|emails|mail|http-client|dumps|redis')
             ->name('placeholder');
     });

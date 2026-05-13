@@ -1,5 +1,5 @@
-import { Link, router } from '@inertiajs/react';
-import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, Search, Users } from 'lucide-react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Database, ExternalLink, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
@@ -7,54 +7,57 @@ import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AppLayout } from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import commandsRoutes from '@/routes/projects/commands';
+import queriesRoutes from '@/routes/projects/queries';
+import type { SharedProps } from '@/types/inertia';
 import type { Paginated } from '@/types/pagination';
 
 type SummaryBucket = {
     bucket: string;
-    successful: number;
-    failed: number;
+    count: number;
     avg_duration: number | null;
     p95_duration: number | null;
 };
 
 type Summary = {
-    totals: { total: number; successful: number; failed: number };
-    duration: {
+    totals: {
+        total: number;
+        total_ms: number;
         min_ms: number | null;
         max_ms: number | null;
         avg_ms: number | null;
         p95_ms: number | null;
-        threshold_ms: number | null;
     };
     buckets: SummaryBucket[];
 };
 
-type CommandRow = {
-    command: string;
-    successful: number;
-    failed: number;
+type QueryRow = {
+    hash: string;
+    sql: string;
+    connection: string | null;
     total: number;
+    total_ms: number;
     avg_ms: number | null;
     p95_ms: number | null;
 };
 
 type Props = {
     summary: Summary;
-    commands: Paginated<CommandRow>;
+    queries: Paginated<QueryRow>;
     selectedRange: string;
     filters: { search: string | null; sort: SortKey; dir: SortDir };
 };
 
-type SortKey = 'command' | 'successful' | 'failed' | 'total' | 'avg_ms' | 'p95_ms';
+type SortKey = 'sql' | 'connection' | 'total' | 'total_ms' | 'avg_ms' | 'p95_ms';
 type SortDir = 'asc' | 'desc';
 
-export default function CommandsIndex({ summary, commands, selectedRange, filters }: Props) {
+export default function QueriesIndex({ summary, queries, selectedRange, filters }: Props) {
+    const { props } = usePage<SharedProps>();
+    const slug = props.currentProject?.slug ?? '';
+
     const [search, setSearch] = useState(filters.search ?? '');
     const sortKey = filters.sort;
     const sortDir = filters.dir;
@@ -72,7 +75,7 @@ export default function CommandsIndex({ summary, commands, selectedRange, filter
     };
 
     const toggleSort = (key: SortKey) => {
-        const nextDir: SortDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : key === 'command' ? 'asc' : 'desc';
+        const nextDir: SortDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : key === 'sql' || key === 'connection' ? 'asc' : 'desc';
         visit({ sort: key, dir: nextDir, page: null });
     };
 
@@ -82,25 +85,8 @@ export default function CommandsIndex({ summary, commands, selectedRange, filter
     };
 
     return (
-        <AppLayout title="Commands">
-            <PageHeader
-                title="Commands"
-                breadcrumbs={[{ label: 'Activity' }, { label: 'Commands' }]}
-                selectedRange={selectedRange}
-                actions={
-                    <Select value="__all__" onValueChange={() => undefined}>
-                        <SelectTrigger className="h-8 w-40 text-xs">
-                            <div className="flex items-center gap-1.5">
-                                <Users className="h-3.5 w-3.5" />
-                                <SelectValue placeholder="All Users" />
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__all__">All Users</SelectItem>
-                        </SelectContent>
-                    </Select>
-                }
-            />
+        <AppLayout title="Queries">
+            <PageHeader title="Queries" breadcrumbs={[{ label: 'Activity' }, { label: 'Queries' }]} selectedRange={selectedRange} />
 
             <div className="space-y-6 px-6 py-6">
                 <div className="grid gap-6 lg:grid-cols-2">
@@ -110,13 +96,16 @@ export default function CommandsIndex({ summary, commands, selectedRange, filter
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle>{commands.total.toLocaleString()} Commands</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                            <Database className="h-4 w-4 text-muted-foreground" />
+                            <span>{queries.total.toLocaleString()} Queries</span>
+                        </CardTitle>
                         <form onSubmit={onSearchSubmit} className="relative w-64">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search commands"
+                                placeholder="Search queries"
                                 className="h-8 pl-8 text-xs"
                             />
                         </form>
@@ -126,28 +115,28 @@ export default function CommandsIndex({ summary, commands, selectedRange, filter
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <SortableHead label="COMMAND" sortKey="command" current={sortKey} dir={sortDir} onSort={toggleSort} />
-                                    <SortableHead label="SUCCESS" sortKey="successful" current={sortKey} dir={sortDir} onSort={toggleSort} align="right" className="w-28" />
-                                    <SortableHead label="FAILED" sortKey="failed" current={sortKey} dir={sortDir} onSort={toggleSort} align="right" className="w-24" />
-                                    <SortableHead label="TOTAL" sortKey="total" current={sortKey} dir={sortDir} onSort={toggleSort} align="right" className="w-24" />
+                                    <SortableHead label="QUERY" sortKey="sql" current={sortKey} dir={sortDir} onSort={toggleSort} />
+                                    <SortableHead label="CONNECTION" sortKey="connection" current={sortKey} dir={sortDir} onSort={toggleSort} className="w-32" />
+                                    <SortableHead label="CALLS" sortKey="total" current={sortKey} dir={sortDir} onSort={toggleSort} align="right" className="w-24" />
+                                    <SortableHead label="TOTAL" sortKey="total_ms" current={sortKey} dir={sortDir} onSort={toggleSort} align="right" className="w-24" />
                                     <SortableHead label="AVG" sortKey="avg_ms" current={sortKey} dir={sortDir} onSort={toggleSort} align="right" className="w-24" />
                                     <SortableHead label="P95" sortKey="p95_ms" current={sortKey} dir={sortDir} onSort={toggleSort} align="right" className="w-24" />
                                     <TableHead className="w-10" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {commands.data.length === 0 ? (
+                                {queries.data.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                                            No commands captured in {selectedRange.toUpperCase()}
+                                            No queries captured in {selectedRange.toUpperCase()}
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    commands.data.map((row) => <CommandRowTr key={row.command} row={row} />)
+                                    queries.data.map((row) => <QueryRowTr key={row.hash} row={row} slug={slug} />)
                                 )}
                             </TableBody>
                         </Table>
-                        <Pagination links={commands.links} from={commands.from} to={commands.to} total={commands.total} />
+                        <Pagination links={queries.links} from={queries.from} to={queries.to} total={queries.total} />
                     </CardContent>
                 </Card>
             </div>
@@ -155,29 +144,81 @@ export default function CommandsIndex({ summary, commands, selectedRange, filter
     );
 }
 
-function CommandRowTr({ row }: { row: CommandRow }) {
-    const slug = (typeof window !== 'undefined' ? window.location.pathname.split('/')[2] : '') || '';
-    const href = commandsRoutes.show({ project: slug, command: row.command }).url;
+function QueryRowTr({ row, slug }: { row: QueryRow; slug: string }) {
+    const href = queriesRoutes.show([slug, row.hash]).url;
 
     return (
         <TableRow className="cursor-pointer hover:bg-muted/50">
             <TableCell className="py-2.5">
                 <Link href={href} className="flex items-center gap-2 font-mono text-xs hover:text-foreground">
-                    <span className="grid h-5 w-5 place-items-center rounded bg-muted text-[10px] text-muted-foreground">$</span>
-                    {row.command}
+                    <Database className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                    <SqlPreview sql={row.sql} />
                 </Link>
             </TableCell>
-            <Numeric value={row.successful} muted />
-            <Numeric value={row.failed} muted />
-            <Numeric value={row.total} />
-            <Numeric value={formatMs(row.avg_ms)} muted raw />
-            <Numeric value={formatMs(row.p95_ms)} muted raw />
+            <TableCell className="py-2.5 font-mono text-xs text-muted-foreground">
+                {row.connection ?? '—'}
+            </TableCell>
+            <Numeric value={formatNumber(row.total)} />
+            <Numeric value={formatMs(row.total_ms)} raw muted />
+            <Numeric value={formatMs(row.avg_ms)} raw muted />
+            <Numeric value={formatMs(row.p95_ms)} raw muted />
             <TableCell className="py-2.5 text-right">
                 <Link href={href} className="inline-flex text-muted-foreground hover:text-foreground">
                     <ExternalLink className="h-3.5 w-3.5" />
                 </Link>
             </TableCell>
         </TableRow>
+    );
+}
+
+function SqlPreview({ sql }: { sql: string }) {
+    const condensed = sql.replace(/\s+/g, ' ').trim();
+    return (
+        <span className="block max-w-[640px] truncate" title={condensed}>
+            <SqlInline sql={condensed} />
+        </span>
+    );
+}
+
+const SQL_KEYWORDS = new Set([
+    'select', 'from', 'where', 'and', 'or', 'on', 'as', 'in', 'is', 'not', 'null',
+    'inner', 'outer', 'left', 'right', 'join', 'group', 'by', 'order', 'limit', 'offset',
+    'insert', 'into', 'values', 'update', 'set', 'delete', 'returning', 'between',
+    'like', 'asc', 'desc', 'count', 'sum', 'avg', 'min', 'max', 'distinct',
+    'having', 'union', 'all', 'case', 'when', 'then', 'else', 'end',
+]);
+
+function SqlInline({ sql }: { sql: string }) {
+    const tokens = sql.split(/(\s+|`[^`]+`|'[^']*'|\?|\(|\)|,)/g);
+    return (
+        <>
+            {tokens.map((tok, i) => {
+                if (tok === '' || tok === undefined) return null;
+                const lower = tok.toLowerCase();
+                if (SQL_KEYWORDS.has(lower)) {
+                    return (
+                        <span key={i} className="text-sky-600 dark:text-sky-400">
+                            {tok}
+                        </span>
+                    );
+                }
+                if (tok.startsWith('`') && tok.endsWith('`')) {
+                    return (
+                        <span key={i} className="text-amber-600 dark:text-amber-400">
+                            {tok}
+                        </span>
+                    );
+                }
+                if (tok === '?' || /^[0-9]+$/.test(tok)) {
+                    return (
+                        <span key={i} className="text-rose-500 dark:text-rose-400">
+                            {tok}
+                        </span>
+                    );
+                }
+                return <span key={i}>{tok}</span>;
+            })}
+        </>
     );
 }
 
@@ -190,36 +231,35 @@ function CallsCard({ summary }: { summary: Summary }) {
     const { totals, buckets } = summary;
     const data = buckets.map((b) => ({
         time: formatTime(b.bucket),
-        Successful: b.successful,
-        Failed: b.failed,
+        Calls: b.count,
     }));
 
     return (
         <Card>
             <CardHeader className="pb-3">
-                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">Calls</CardTitle>
+                <CardTitle className="text-xs tracking-wider text-muted-foreground uppercase">Calls</CardTitle>
             </CardHeader>
             <Separator />
             <CardContent className="p-5">
                 <div className="flex items-baseline gap-6">
                     <div>
-                        <div className="text-3xl font-semibold">{formatNumber(totals.total)}</div>
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Calls</div>
+                        <div className="text-3xl font-semibold">{formatCompact(totals.total)}</div>
+                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">Calls</div>
                     </div>
-                    <Separator orientation="vertical" className="h-10" />
-                    <Stat label="Failed" value={formatNumber(totals.failed)} accent="text-rose-600 dark:text-rose-400" dot="bg-rose-500" />
-                    <Stat label="Successful" value={formatNumber(totals.successful)} accent="text-emerald-600 dark:text-emerald-400" dot="bg-emerald-500" />
                 </div>
 
                 <div className="mt-5 h-40">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={data}>
                             <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} interval={Math.max(0, Math.floor(data.length / 6))} />
+                            <XAxis
+                                dataKey="time"
+                                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                                interval={Math.max(0, Math.floor(data.length / 6))}
+                            />
                             <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={28} />
                             <Tooltip cursor={{ fill: 'var(--color-muted)' }} contentStyle={tooltipStyle} />
-                            <Bar dataKey="Successful" stackId="s" fill="#10b981" />
-                            <Bar dataKey="Failed" stackId="s" fill="#ef4444" radius={[2, 2, 0, 0]} />
+                            <Bar dataKey="Calls" fill="#94a3b8" radius={[2, 2, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
@@ -229,7 +269,7 @@ function CallsCard({ summary }: { summary: Summary }) {
 }
 
 function DurationCard({ summary }: { summary: Summary }) {
-    const { duration, buckets } = summary;
+    const { totals, buckets } = summary;
     const data = buckets.map((b) => ({
         time: formatTime(b.bucket),
         avg: b.avg_duration ?? 0,
@@ -239,33 +279,37 @@ function DurationCard({ summary }: { summary: Summary }) {
     return (
         <Card>
             <CardHeader className="pb-3">
-                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">Duration</CardTitle>
+                <CardTitle className="text-xs tracking-wider text-muted-foreground uppercase">Duration</CardTitle>
             </CardHeader>
             <Separator />
             <CardContent className="p-5">
                 <div className="flex items-baseline gap-6">
                     <div>
                         <div className="text-3xl font-semibold">
-                            {formatMs(duration.min_ms)}
+                            {formatMs(totals.min_ms)}
                             <span className="px-2 text-base text-muted-foreground">–</span>
-                            {formatMs(duration.max_ms)}
+                            {formatMs(totals.max_ms)}
                         </div>
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Min – Max</div>
+                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">Min – Max</div>
                     </div>
                     <Separator orientation="vertical" className="h-10" />
-                    <Stat label="Avg" value={formatMs(duration.avg_ms)} accent="text-indigo-600 dark:text-indigo-400" dot="bg-indigo-500" />
-                    <Stat label="P95" value={formatMs(duration.p95_ms)} accent="text-violet-600 dark:text-violet-400" dot="bg-amber-500" />
+                    <Stat label="Avg" value={formatMs(totals.avg_ms)} accent="text-indigo-600 dark:text-indigo-400" dot="bg-indigo-500" />
+                    <Stat label="P95" value={formatMs(totals.p95_ms)} accent="text-amber-600 dark:text-amber-400" dot="bg-amber-500" />
                 </div>
 
                 <div className="mt-5 h-40">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={data}>
                             <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} interval={Math.max(0, Math.floor(data.length / 6))} />
+                            <XAxis
+                                dataKey="time"
+                                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                                interval={Math.max(0, Math.floor(data.length / 6))}
+                            />
                             <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={28} unit="ms" />
-                            <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${Number(value).toFixed(0)} ms`} />
-                            <Line type="monotone" dataKey="avg" stroke="#6366f1" strokeWidth={2} dot={{ r: 2, fill: '#6366f1' }} activeDot={{ r: 4 }} />
-                            <Line type="monotone" dataKey="p95" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2, fill: '#f59e0b' }} />
+                            <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${Number(value).toFixed(2)} ms`} />
+                            <Line type="monotone" dataKey="avg" stroke="#9ca3af" strokeWidth={1.5} dot={false} />
+                            <Line type="monotone" dataKey="p95" stroke="#f59e0b" strokeWidth={1.5} dot={false} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -299,7 +343,7 @@ function SortableHead({
                 type="button"
                 onClick={() => onSort(sortKey)}
                 className={cn(
-                    'inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider',
+                    'inline-flex items-center gap-1 text-[10px] font-semibold tracking-wider uppercase',
                     align === 'right' && 'flex-row-reverse',
                     isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}
@@ -314,7 +358,7 @@ function SortableHead({
 function Stat({ label, value, accent, dot }: { label: string; value: string; accent: string; dot?: string }) {
     return (
         <div>
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-[10px] tracking-wider text-muted-foreground uppercase">
                 {dot ? <span className={cn('h-1.5 w-1.5 rounded-full', dot)} /> : null}
                 {label}
             </div>
@@ -327,14 +371,23 @@ function formatNumber(value: number): string {
     return new Intl.NumberFormat().format(value);
 }
 
+function formatCompact(value: number): string {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(value % 1_000 === 0 ? 0 : 1)}K`;
+    return new Intl.NumberFormat().format(value);
+}
+
 function formatMs(value: number | null): string {
     if (value === null || Number.isNaN(value)) {
         return '—';
     }
-    if (value >= 1000) {
-        return `${(value / 1000).toFixed(2)} s`;
+    if (value < 1) {
+        return `${Math.round(value * 1000)}µs`;
     }
-    return `${Math.round(value)} ms`;
+    if (value >= 1000) {
+        return `${(value / 1000).toFixed(2)}s`;
+    }
+    return `${value.toFixed(2)}ms`;
 }
 
 function formatTime(iso: string): string {

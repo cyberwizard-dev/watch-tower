@@ -36,6 +36,7 @@ import commands from '@/routes/projects/commands';
 import exceptions from '@/routes/projects/exceptions';
 import issues from '@/routes/projects/issues';
 import jobs from '@/routes/projects/jobs';
+import queries from '@/routes/projects/queries';
 import requests from '@/routes/projects/requests';
 import scheduledTasks from '@/routes/projects/scheduled-tasks';
 import type { User } from '@/types/auth';
@@ -237,8 +238,8 @@ function navigationGroups(project: CurrentProject): NavGroup[] {
                 {
                     label: 'Queries',
                     icon: Database,
-                    href: placeholder({ project: slug, section: 'queries' }).url,
-                    matches: (p) => p.endsWith('/queries'),
+                    href: queries.index(slug).url,
+                    matches: (p) => p.endsWith('/queries') || p.includes('/queries?') || p.includes('/queries/'),
                 },
                 {
                     label: 'Models',
