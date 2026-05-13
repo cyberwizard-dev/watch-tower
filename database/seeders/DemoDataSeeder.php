@@ -60,6 +60,14 @@ class DemoDataSeeder extends Seeder
         $now = CarbonImmutable::now();
         $start = $now->subDay();
 
+        $endUsers = [];
+        for ($i = 1; $i <= 60; $i++) {
+            $endUsers[] = [
+                'id' => 'usr_'.Str::random(10),
+                'email' => 'end-user-'.$i.'@flywp.test',
+            ];
+        }
+
         $routes = [
             ['GET', '/api/users', 200, 12],
             ['GET', '/api/users', 200, 18],
@@ -103,6 +111,9 @@ class DemoDataSeeder extends Seeder
             $offsetSeconds = random_int(0, 86_400);
             $occurredAt = $start->addSeconds($offsetSeconds);
 
+            $hasUser = random_int(1, 100) <= 80;
+            $endUser = $hasUser ? $endUsers[array_rand($endUsers)] : null;
+
             $traces[] = [
                 'id' => (string) Str::uuid(),
                 'project_id' => $project->id,
@@ -110,6 +121,8 @@ class DemoDataSeeder extends Seeder
                 'method' => $method,
                 'uri' => $uri,
                 'status_code' => $status,
+                'user_identifier' => $endUser['id'] ?? null,
+                'user_email' => $endUser['email'] ?? null,
                 'duration_ms' => $duration,
                 'db_queries_count' => random_int(0, 18),
                 'db_time_ms' => random_int(0, max(1, (int) ($duration / 3))),

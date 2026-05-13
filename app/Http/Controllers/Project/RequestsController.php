@@ -4,37 +4,42 @@ namespace App\Http\Controllers\Project;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Watch\Stats\RequestStats;
+use App\Watch\Stats\TimeRange;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class RequestsController extends Controller
 {
-    public function index(Project $project, Request $request): Response
+    public function index(Project $project, Request $request, RequestStats $stats): Response
     {
-        $traces = $project->traces()
-            ->latest('occurred_at')
-            ->when($request->string('status')->toString() === 'error', fn ($q) => $q->where('status_code', '>=', 400))
-            ->when($request->string('status')->toString() === 'success', fn ($q) => $q->where('status_code', '<', 400))
-            ->paginate(25)
-            ->withQueryString()
-            ->through(fn ($trace) => [
-                'id' => $trace->id,
-                'correlation_id' => $trace->correlation_id,
-                'method' => $trace->method,
-                'uri' => $trace->uri,
-                'status_code' => $trace->status_code,
-                'duration_ms' => $trace->duration_ms,
-                'db_queries_count' => $trace->db_queries_count,
-                'has_errors' => $trace->has_errors,
-                'environment' => $trace->environment,
-                'occurred_at' => $trace->occurred_at?->toIso8601String(),
-            ]);
+        $range = TimeRange::fromLabel($request->string('range', '1h')->toString());
+        $userId = $request->string('user_id')->toString() ?: null;
+        $search = trim($request->string('search')->toString()) ?: null;
+        $routeMethod = $request->string('route_method')->toString() ?: null;
+        $routeUri = $request->string('route_uri')->toString() ?: null;
+
+        $summary = $stats->summary($project, $range, $userId);
+        $routes = $stats->routes($project, $range, $userId, $search);
+        $users = $stats->topUsers($project, $range);
+
+        $routeDetail = null;
+        if ($routeMethod !== null && $routeUri !== null) {
+            $routeDetail = $stats->routeDetail($project, $range, $routeMethod, $routeUri, $userId);
+        }
 
         return Inertia::render('projects/requests/index', [
-            'traces' => $traces,
+            'summary' => $summary,
+            'routes' => $routes,
+            'users' => $users,
+            'routeDetail' => $routeDetail,
+            'selectedRange' => $range->label,
             'filters' => [
-                'status' => $request->string('status')->toString() ?: null,
+                'user_id' => $userId,
+                'search' => $search,
+                'route_method' => $routeMethod,
+                'route_uri' => $routeUri,
             ],
         ]);
     }
