@@ -36,7 +36,15 @@
       "Bash(curl -s -H \"X-Inertia: true\" -H \"X-Inertia-Version: 1\" \"http://127.0.0.1:8765/projects/acme-app/requests?range=24h\")",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); p=d.get\\('props',{}\\); print\\('keys:', list\\(p.keys\\(\\)\\)\\); s=p.get\\('summary',{}\\); print\\('totals:', s.get\\('totals'\\)\\); print\\('routes_count:', len\\(p.get\\('routes',[]\\)\\)\\); print\\('users_count:', len\\(p.get\\('users',[]\\)\\)\\); print\\('sample_route:', p.get\\('routes',[{}]\\)[0] if p.get\\('routes'\\) else None\\)\")",
       "Bash(curl -s \"http://127.0.0.1:8765/projects/acme-app/requests?range=24h\" -o /tmp/lw-req.html)",
-      "Bash(python3 -)"
+      "Bash(python3 -)",
+      "Bash(curl -s -o /dev/null -w \"  %{http_code}\\\\n\" \"http://127.0.0.1:8765/projects/acme-app/jobs\")",
+      "Bash(curl -s -o /dev/null -w \"  %{http_code}\\\\n\" \"http://127.0.0.1:8765/projects/acme-app/jobs?range=24h&search=Backup\")",
+      "Bash(curl -s -o /tmp/lw-job-show.html -w '  %{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/jobs/__TRACKED_VAR__?range=30d)",
+      "Bash(curl -s -o /dev/null -w \"  %{http_code}\\\\n\" \"http://127.0.0.1:8765/projects/acme-app/jobs/App--Jobs--DoesNotExist?range=30d\")",
+      "Bash(curl -s \"http://127.0.0.1:8765/projects/acme-app/jobs?range=30d\" -o /tmp/lw-jobs-idx.html)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/)",
+      "Bash(curl -s -o /tmp/cmds-show.html -w 'HTTP %{http_code}\\\\n' 'http://127.0.0.1:8765/projects/acme-app/commands/backup:daily')",
+      "Bash(curl -s -o /tmp/st-show.html -w 'SHOW HTTP %{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/scheduled-tasks/__TRACKED_VAR__)"
     ],
     "additionalDirectories": [
       "/tmp"

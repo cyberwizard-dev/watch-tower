@@ -90,4 +90,20 @@ class Project extends Model
     {
         return $this->hasMany(QueueJobRun::class);
     }
+
+    /**
+     * @return HasMany<CommandRun, $this>
+     */
+    public function commandRuns(): HasMany
+    {
+        return $this->hasMany(CommandRun::class);
+    }
+
+    /**
+     * @return HasMany<ScheduledTaskRun, $this>
+     */
+    public function scheduledTaskRuns(): HasMany
+    {
+        return $this->hasMany(ScheduledTaskRun::class);
+    }
 }

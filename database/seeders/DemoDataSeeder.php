@@ -2,11 +2,13 @@
 
 namespace Database\Seeders;
 
+use App\Models\CommandRun;
 use App\Models\ErrorGroup;
 use App\Models\ErrorOccurrence;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\QueueJobRun;
+use App\Models\ScheduledTaskRun;
 use App\Models\Trace;
 use App\Models\TraceQuery;
 use App\Models\User;
@@ -151,6 +153,8 @@ class DemoDataSeeder extends Seeder
         $this->seedExceptions($project, $traces, $start, $teamUsers);
         $this->seedQueries($project, $traces);
         $this->seedJobs($project, $start);
+        $this->seedCommands($project, $start);
+        $this->seedScheduledTasks($project, $start, $now);
     }
 
     /**
@@ -408,36 +412,59 @@ class DemoDataSeeder extends Seeder
     private function seedJobs(Project $project, CarbonImmutable $start): void
     {
         $jobClasses = [
+            'App\\Events\\Backup\\BackupCreated',
+            'App\\Events\\Backup\\BackupSuccess',
+            'App\\Events\\Server\\ResourceMonitorStatsReceived',
+            'App\\Events\\Site\\CertificateStatusUpdated',
+            'App\\Events\\Site\\SiteActive',
+            'App\\Events\\Site\\SiteCreationProgress',
+            'App\\Events\\Site\\SiteDeleted',
+            'App\\Jobs\\Certificate\\DeployScript',
             'App\\Jobs\\SendInvoiceEmail',
             'App\\Jobs\\ProcessPayment',
             'App\\Jobs\\GenerateReport',
             'App\\Jobs\\SyncCustomer',
             'App\\Jobs\\PruneAuditLog',
+            'App\\Jobs\\IndexSearch',
+            'App\\Jobs\\WarmCache',
+            'App\\Jobs\\ExportCsv',
         ];
-        $statuses = ['completed', 'completed', 'completed', 'completed', 'failed', 'released'];
+
+        $connections = ['redis', 'redis', 'redis', 'database', 'sqs'];
+        $queues = ['default', 'default', 'default', 'high', 'low', 'emails'];
+
+        // Weighted status distribution: mostly completed, some released/queued, rare failures.
+        $statuses = [
+            'completed', 'completed', 'completed', 'completed', 'completed',
+            'completed', 'completed', 'completed', 'completed', 'completed',
+            'released', 'released',
+            'queued',
+            'failed',
+        ];
 
         $rows = [];
-        for ($i = 0; $i < 320; $i++) {
+        for ($i = 0; $i < 600; $i++) {
             $dispatched = $start->addSeconds(random_int(0, 86_400));
-            $startedAt = $dispatched->addSeconds(random_int(0, 5));
-            $duration = random_int(40, 4_200);
             $status = $statuses[array_rand($statuses)];
-            $completedAt = $status === 'completed' ? $startedAt->addMilliseconds($duration) : null;
-            $failedAt = $status === 'failed' ? $startedAt->addMilliseconds($duration) : null;
+            $duration = random_int(20, 6_200);
+
+            $startedAt = $status === 'queued' ? null : $dispatched->addSeconds(random_int(0, 5));
+            $completedAt = $status === 'completed' && $startedAt !== null ? $startedAt->addMilliseconds($duration) : null;
+            $failedAt = $status === 'failed' && $startedAt !== null ? $startedAt->addMilliseconds($duration) : null;
 
             $rows[] = [
                 'id' => (string) Str::uuid(),
                 'project_id' => $project->id,
                 'trace_id' => null,
                 'job_class' => $jobClasses[array_rand($jobClasses)],
-                'queue' => 'default',
-                'connection' => 'redis',
+                'queue' => $queues[array_rand($queues)],
+                'connection' => $connections[array_rand($connections)],
                 'dispatched_at' => $dispatched,
                 'started_at' => $startedAt,
                 'completed_at' => $completedAt,
                 'failed_at' => $failedAt,
-                'duration_ms' => $duration,
-                'attempts' => $status === 'failed' ? random_int(2, 3) : 1,
+                'duration_ms' => $status === 'queued' ? null : $duration,
+                'attempts' => $status === 'failed' ? random_int(2, 3) : ($status === 'queued' ? 0 : 1),
                 'status' => $status,
                 'payload' => json_encode([]),
                 'exception' => $status === 'failed' ? json_encode(['class' => 'RuntimeException', 'message' => 'demo failure']) : null,
@@ -449,6 +476,173 @@ class DemoDataSeeder extends Seeder
 
         foreach (array_chunk($rows, 200) as $chunk) {
             QueueJobRun::query()->insert($chunk);
+        }
+    }
+
+    private function seedCommands(Project $project, CarbonImmutable $start): void
+    {
+        $commands = [
+            ['command' => 'backup:daily', 'base_duration' => 4_200, 'fail_rate' => 5],
+            ['command' => 'backup:hourly', 'base_duration' => 1_800, 'fail_rate' => 3],
+            ['command' => 'backup:sweep', 'base_duration' => 320, 'fail_rate' => 1],
+            ['command' => 'servers:cleanup-ssh-key-files', 'base_duration' => 145, 'fail_rate' => 2],
+            ['command' => 'uploads:clear', 'base_duration' => 85, 'fail_rate' => 0],
+            ['command' => 'alerts:cleanup-migration-failure-archives', 'base_duration' => 230, 'fail_rate' => 4],
+            ['command' => 'queue:prune-batches', 'base_duration' => 60, 'fail_rate' => 1],
+            ['command' => 'cache:prune-stale-tags', 'base_duration' => 28, 'fail_rate' => 0],
+        ];
+
+        $environments = ['production', 'production', 'production', 'staging'];
+
+        $rows = [];
+        for ($i = 0; $i < 420; $i++) {
+            $tpl = $commands[array_rand($commands)];
+
+            $jitter = random_int(-30, 220) / 100;
+            $duration = max(5, (int) round($tpl['base_duration'] * (1 + $jitter)));
+
+            $failed = random_int(1, 100) <= $tpl['fail_rate'];
+            $exitCode = $failed ? [1, 1, 1, 2, 127][array_rand([1, 1, 1, 2, 127])] : 0;
+            $status = $failed ? 'failed' : 'completed';
+
+            $offsetSeconds = random_int(0, 86_400);
+            $occurredAt = $start->addSeconds($offsetSeconds);
+
+            $rows[] = [
+                'id' => (string) Str::uuid(),
+                'project_id' => $project->id,
+                'command' => $tpl['command'],
+                'arguments' => json_encode([]),
+                'options' => json_encode(['--quiet' => false]),
+                'status' => $status,
+                'exit_code' => $exitCode,
+                'duration_ms' => $duration,
+                'output' => $failed
+                    ? "Error: process exited with code {$exitCode}\n  at ".$tpl['command']
+                    : "Completed {$tpl['command']} in {$duration}ms",
+                'environment' => $environments[array_rand($environments)],
+                'occurred_at' => $occurredAt,
+                'created_at' => $occurredAt,
+                'updated_at' => $occurredAt,
+            ];
+        }
+
+        foreach (array_chunk($rows, 200) as $chunk) {
+            CommandRun::query()->insert($chunk);
+        }
+    }
+
+    private function seedScheduledTasks(Project $project, CarbonImmutable $start, CarbonImmutable $now): void
+    {
+        $tasks = [
+            [
+                'task' => 'php artisan backup:daily',
+                'schedule' => 'Every hour',
+                'schedule_summary' => 'AT 02:00 AM',
+                'next_run_at' => $now->addMinutes(46),
+                'base_duration' => 920,
+                'fail_rate' => 5,
+                'skip_rate' => 2,
+            ],
+            [
+                'task' => 'php artisan backup:hourly',
+                'schedule' => 'Every hour',
+                'schedule_summary' => 'AT MINUTE 00',
+                'next_run_at' => $now->addMinutes(46),
+                'base_duration' => 540,
+                'fail_rate' => 3,
+                'skip_rate' => 5,
+            ],
+            [
+                'task' => 'php artisan backup:sweep',
+                'schedule' => 'Every 15 minutes',
+                'schedule_summary' => 'EVERY 15 MINUTES',
+                'next_run_at' => $now->addMinutes(1),
+                'base_duration' => 18,
+                'fail_rate' => 1,
+                'skip_rate' => 0,
+            ],
+            [
+                'task' => 'php artisan servers:cleanup-ssh-key-files',
+                'schedule' => 'Every hour',
+                'schedule_summary' => 'AT MINUTE 00',
+                'next_run_at' => $now->addMinutes(46),
+                'base_duration' => 1_680,
+                'fail_rate' => 2,
+                'skip_rate' => 0,
+            ],
+            [
+                'task' => 'php artisan uploads:clear',
+                'schedule' => 'At 25 minutes past the hour',
+                'schedule_summary' => 'AT MINUTE 25',
+                'next_run_at' => $now->addMinutes(11),
+                'base_duration' => 466,
+                'fail_rate' => 0,
+                'skip_rate' => 0,
+            ],
+            [
+                'task' => 'Closure at: routes/console.php:38',
+                'schedule' => 'Every day at 02:00',
+                'schedule_summary' => 'AT 02:00 AM',
+                'next_run_at' => $now->addDay()->setTime(2, 0),
+                'base_duration' => 14,
+                'fail_rate' => 0,
+                'skip_rate' => 0,
+            ],
+        ];
+
+        $environments = ['production', 'production', 'production', 'staging'];
+
+        $rows = [];
+        foreach ($tasks as $tpl) {
+            $runs = random_int(40, 90);
+            $hash = sha1($tpl['task']);
+
+            for ($i = 0; $i < $runs; $i++) {
+                $jitter = random_int(-25, 180) / 100;
+                $duration = max(2, (int) round($tpl['base_duration'] * (1 + $jitter)));
+
+                $roll = random_int(1, 100);
+                if ($roll <= $tpl['fail_rate']) {
+                    $status = 'failed';
+                    $exitCode = [1, 1, 2, 127][array_rand([1, 1, 2, 127])];
+                } elseif ($roll <= $tpl['fail_rate'] + $tpl['skip_rate']) {
+                    $status = 'skipped';
+                    $exitCode = null;
+                    $duration = null;
+                } else {
+                    $status = 'processed';
+                    $exitCode = 0;
+                }
+
+                $offsetSeconds = random_int(0, 86_400);
+                $occurredAt = $start->addSeconds($offsetSeconds);
+
+                $rows[] = [
+                    'id' => (string) Str::uuid(),
+                    'project_id' => $project->id,
+                    'task' => $tpl['task'],
+                    'task_hash' => $hash,
+                    'schedule' => $tpl['schedule'],
+                    'schedule_summary' => $tpl['schedule_summary'],
+                    'next_run_at' => $tpl['next_run_at'],
+                    'status' => $status,
+                    'exit_code' => $exitCode,
+                    'duration_ms' => $duration,
+                    'threshold_ms' => null,
+                    'output' => $status === 'failed'
+                        ? "Error: process exited with code {$exitCode}"
+                        : ($status === 'skipped' ? 'Skipped by withoutOverlapping()' : "Completed in {$duration}ms"),
+                    'environment' => $environments[array_rand($environments)],
+                    'occurred_at' => $occurredAt,
+                    'created_at' => $occurredAt,
+                    'updated_at' => $occurredAt,
+                ];
+            }
+        }
+
+        foreach (array_chunk($rows, 200) as $chunk) {
+            ScheduledTaskRun::query()->insert($chunk);
         }
     }
 }

@@ -32,9 +32,12 @@ import { Separator } from '@/components/ui/separator';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { dashboard, placeholder } from '@/routes/projects';
+import commands from '@/routes/projects/commands';
 import exceptions from '@/routes/projects/exceptions';
 import issues from '@/routes/projects/issues';
+import jobs from '@/routes/projects/jobs';
 import requests from '@/routes/projects/requests';
+import scheduledTasks from '@/routes/projects/scheduled-tasks';
 import type { User } from '@/types/auth';
 import type { CurrentProject, ProjectSummary } from '@/types/inertia';
 
@@ -210,20 +213,20 @@ function navigationGroups(project: CurrentProject): NavGroup[] {
                 {
                     label: 'Jobs',
                     icon: Workflow,
-                    href: placeholder({ project: slug, section: 'jobs' }).url,
-                    matches: (p) => p.endsWith('/jobs'),
+                    href: jobs.index(slug).url,
+                    matches: (p) => p.endsWith('/jobs') || p.includes('/jobs?') || p.includes('/jobs/'),
                 },
                 {
                     label: 'Commands',
                     icon: Terminal,
-                    href: placeholder({ project: slug, section: 'commands' }).url,
-                    matches: (p) => p.endsWith('/commands'),
+                    href: commands.index(slug).url,
+                    matches: (p) => p.endsWith('/commands') || p.includes('/commands?') || p.includes('/commands/'),
                 },
                 {
                     label: 'Scheduled Tasks',
                     icon: CalendarClock,
-                    href: placeholder({ project: slug, section: 'schedule' }).url,
-                    matches: (p) => p.endsWith('/schedule'),
+                    href: scheduledTasks.index(slug).url,
+                    matches: (p) => p.endsWith('/scheduled-tasks') || p.includes('/scheduled-tasks?') || p.includes('/scheduled-tasks/'),
                 },
                 {
                     label: 'Exceptions',
