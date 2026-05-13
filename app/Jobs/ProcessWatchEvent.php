@@ -22,7 +22,7 @@ class ProcessWatchEvent implements ShouldQueue
         public readonly string $projectId,
         public readonly array $event,
     ) {
-        $this->onQueue('watch-events');
+        // $this->onQueue('watch-events');
     }
 
     public function handle(EventStore $store): void
