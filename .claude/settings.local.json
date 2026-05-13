@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan *)",
+      "Bash(vendor/bin/pint --dirty --format agent)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://127.0.0.1:8765/ -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(curl -sL -o /tmp/dash.html -w \"code=%{http_code} url=%{url_effective}\\\\n\" http://127.0.0.1:8765/)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -H \"X-Inertia: true\" -H \"X-Inertia-Version: x\" -H \"Accept: application/json\" http://127.0.0.1:8765/projects/acme-app/dashboard)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('component:', d.get\\('component'\\)\\); print\\('keys:', list\\(d.get\\('props', {}\\).keys\\(\\)\\)\\); print\\('range:', d['props']['selectedRange']\\); a=d['props']['stats']['activity']; print\\('requests total:', a['requests']['total']\\); print\\('buckets len:', len\\(a['buckets']\\)\\)\")",
+      "Bash(curl -s -w \"code=%{http_code}\\\\n\" -H \"X-Inertia: true\" -H \"X-Inertia-Version: x\" -H \"Accept: application/json\" http://127.0.0.1:8765/projects/acme-app/dashboard)",
+      "Bash(curl -s http://127.0.0.1:8765/projects/acme-app/dashboard -o /tmp/dash.html -w \"code=%{http_code}\\\\n\")",
+      "Read(//private/tmp/**)",
+      "Bash(curl -s http://127.0.0.1:8765/projects/acme-app/requests -o /tmp/req.html -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s http://127.0.0.1:8765/projects/acme-app/exceptions -o /tmp/exc.html -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s http://127.0.0.1:8765/projects/acme-app/jobs -o /tmp/jobs.html -w \"%{http_code}\\\\n\")"
+    ]
+  }
+}
