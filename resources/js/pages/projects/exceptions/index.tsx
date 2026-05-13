@@ -93,12 +93,14 @@ export default function ExceptionsIndex({ groups, filters }: Props) {
                                                     </span>
                                                 </div>
                                                 <p className="mt-1 truncate text-sm font-medium">{group.first_message}</p>
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    {group.total_count.toLocaleString()} occurrence
-                                                    {group.total_count === 1 ? '' : 's'}
-                                                    <Separator orientation="vertical" className="mx-2 inline-block h-3 align-middle" />
-                                                    last seen {formatRelative(group.last_occurrence_at)}
-                                                </p>
+                                                <div className="mt-1 flex items-center text-xs text-muted-foreground">
+                                                    <span>
+                                                        {group.total_count.toLocaleString()} occurrence
+                                                        {group.total_count === 1 ? '' : 's'}
+                                                    </span>
+                                                    <Separator orientation="vertical" className="mx-2 h-3" />
+                                                    <span>last seen {formatRelative(group.last_occurrence_at)}</span>
+                                                </div>
                                             </div>
                                             <StatusBadge status={group.status} />
                                         </div>
