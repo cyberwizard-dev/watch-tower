@@ -248,7 +248,7 @@ class IssuesController extends Controller
             ->where('project_id', $project->id)
             ->whereIn('error_group_id', $groupIds)
             ->whereBetween('occurred_at', [$start, $end])
-            ->selectRaw('error_group_id, strftime("%Y-%m-%d", occurred_at) as day, count(*) as total')
+            ->selectRaw('error_group_id, DATE(occurred_at) as day, count(*) as total')
             ->groupBy('error_group_id', 'day')
             ->get();
 

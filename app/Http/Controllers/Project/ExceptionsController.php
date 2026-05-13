@@ -114,7 +114,7 @@ class ExceptionsController extends Controller
             ->where('project_id', $project->id)
             ->where('error_group_id', $groupId)
             ->whereBetween('occurred_at', [$start, $end])
-            ->selectRaw('strftime("%Y-%m-%d", occurred_at) as day, count(*) as total')
+            ->selectRaw('DATE(occurred_at) as day, count(*) as total')
             ->groupBy('day')
             ->pluck('total', 'day')
             ->all();
