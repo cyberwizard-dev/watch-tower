@@ -57,7 +57,16 @@
       "Bash(/usr/bin/curl -s \"http://localhost:8765/projects/acme-app/queries?sort=total&dir=asc&page=2\")",
       "Bash(/usr/bin/grep -oE '\"current_page\":[0-9]+' /tmp/p2.html)",
       "Bash(/usr/bin/head -1)",
-      "Bash(/usr/bin/grep -oE '\"filters\":\\\\{[^}]+\\\\}' /tmp/p2.html)"
+      "Bash(/usr/bin/grep -oE '\"filters\":\\\\{[^}]+\\\\}' /tmp/p2.html)",
+      "Bash(/usr/bin/grep -n \"seed[A-Z]\" /Users/wedevs/Desktop/projects/laravel/database/seeders/DemoDataSeeder.php)",
+      "Bash(/usr/bin/grep -n \"Mail\\\\|Notifications\\\\|placeholder\" /Users/wedevs/Desktop/projects/laravel/resources/js/layouts/project-shell.tsx)",
+      "Bash(/usr/bin/curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/projects/acme-app/mail)",
+      "Bash(/usr/bin/curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/projects/acme-app/notifications)",
+      "Bash(/usr/bin/curl -s -o /dev/null -w 'mail/show: %{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/mail/5cc8bfc4c4a5a3749df3541bac1e8f795a51c0ba)",
+      "Bash(/usr/bin/curl -s -o /dev/null -w 'notifications/show: %{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/notifications/8a63233eafe5806e4c7407816a197b582e964fe6)",
+      "Bash(/usr/bin/curl -s -o /dev/null -w 'mail/show: %{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/mail/612b3bc6cfa82605363cdcd6b4ee8dbbe315ee6c)",
+      "Bash(/usr/bin/curl -s -o /dev/null -w 'notifications/show: %{http_code}\\\\n' \"http://127.0.0.1:8765/projects/acme-app/notifications/$\\(php artisan tinker --execute 'echo sha1\\(\\\\App\\\\Models\\\\NotificationSend::query\\(\\)->value\\(\"notification_class\"\\)\\);' 2>&1)",
+      "Bash(/usr/bin/pkill -f \"artisan serve --port=8765\")"
     ],
     "additionalDirectories": [
       "/tmp"

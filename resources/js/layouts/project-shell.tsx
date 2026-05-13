@@ -36,6 +36,8 @@ import commands from '@/routes/projects/commands';
 import exceptions from '@/routes/projects/exceptions';
 import issues from '@/routes/projects/issues';
 import jobs from '@/routes/projects/jobs';
+import mail from '@/routes/projects/mail';
+import notifications from '@/routes/projects/notifications';
 import queries from '@/routes/projects/queries';
 import requests from '@/routes/projects/requests';
 import scheduledTasks from '@/routes/projects/scheduled-tasks';
@@ -256,14 +258,14 @@ function navigationGroups(project: CurrentProject): NavGroup[] {
                 {
                     label: 'Notifications',
                     icon: Bell,
-                    href: placeholder({ project: slug, section: 'notifications' }).url,
-                    matches: (p) => p.endsWith('/notifications'),
+                    href: notifications.index(slug).url,
+                    matches: (p) => p.includes('/notifications'),
                 },
                 {
                     label: 'Mail',
                     icon: Mail,
-                    href: placeholder({ project: slug, section: 'mail' }).url,
-                    matches: (p) => p.endsWith('/mail'),
+                    href: mail.index(slug).url,
+                    matches: (p) => p.includes('/mail'),
                 },
                 {
                     label: 'HTTP Client',

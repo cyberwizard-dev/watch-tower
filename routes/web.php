@@ -5,6 +5,8 @@ use App\Http\Controllers\Project\CommandsController;
 use App\Http\Controllers\Project\ExceptionsController;
 use App\Http\Controllers\Project\IssuesController;
 use App\Http\Controllers\Project\JobsController;
+use App\Http\Controllers\Project\MailController;
+use App\Http\Controllers\Project\NotificationsController;
 use App\Http\Controllers\Project\PlaceholderController;
 use App\Http\Controllers\Project\QueriesController;
 use App\Http\Controllers\Project\RequestsController;
@@ -47,7 +49,15 @@ Route::scopeBindings()
         Route::get('/queries/{query}', [QueriesController::class, 'show'])
             ->where('query', '[A-Fa-f0-9]{40}')
             ->name('queries.show');
+        Route::get('/mail', [MailController::class, 'index'])->name('mail.index');
+        Route::get('/mail/{mail}', [MailController::class, 'show'])
+            ->where('mail', '[A-Fa-f0-9]{40}')
+            ->name('mail.show');
+        Route::get('/notifications', [NotificationsController::class, 'index'])->name('notifications.index');
+        Route::get('/notifications/{notification}', [NotificationsController::class, 'show'])
+            ->where('notification', '[A-Fa-f0-9]{40}')
+            ->name('notifications.show');
         Route::get('/{section}', PlaceholderController::class)
-            ->where('section', 'events|notifications|logs|cache|gates|views|models|emails|mail|http-client|dumps|redis')
+            ->where('section', 'events|logs|cache|gates|views|models|http-client|dumps|redis')
             ->name('placeholder');
     });

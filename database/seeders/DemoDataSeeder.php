@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\CommandRun;
 use App\Models\ErrorGroup;
 use App\Models\ErrorOccurrence;
+use App\Models\MailSend;
+use App\Models\NotificationSend;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\QueueJobRun;
@@ -155,6 +157,8 @@ class DemoDataSeeder extends Seeder
         $this->seedJobs($project, $start);
         $this->seedCommands($project, $start);
         $this->seedScheduledTasks($project, $start, $now);
+        $this->seedMail($project, $start);
+        $this->seedNotifications($project, $start);
     }
 
     /**
@@ -748,6 +752,205 @@ class DemoDataSeeder extends Seeder
 
         foreach (array_chunk($rows, 200) as $chunk) {
             ScheduledTaskRun::query()->insert($chunk);
+        }
+    }
+
+    private function seedMail(Project $project, CarbonImmutable $start): void
+    {
+        $mailables = [
+            [
+                'class' => 'App\\Mail\\OrderShipped',
+                'subject' => 'Your order has shipped',
+                'base_duration' => 280,
+                'mailer' => 'smtp',
+                'source_type' => 'job',
+                'source_label' => 'App\\Jobs\\SendShipmentNotice',
+            ],
+            [
+                'class' => 'App\\Mail\\WelcomeEmail',
+                'subject' => 'Welcome to Acme',
+                'base_duration' => 140,
+                'mailer' => 'smtp',
+                'source_type' => 'controller',
+                'source_label' => 'App\\Http\\Controllers\\Auth\\RegisterController@store',
+            ],
+            [
+                'class' => 'App\\Mail\\PasswordResetEmail',
+                'subject' => 'Reset your password',
+                'base_duration' => 90,
+                'mailer' => 'smtp',
+                'source_type' => 'controller',
+                'source_label' => 'App\\Http\\Controllers\\Auth\\ForgotPasswordController@sendResetLinkEmail',
+            ],
+            [
+                'class' => 'App\\Mail\\InvoiceReady',
+                'subject' => 'Your invoice is ready',
+                'base_duration' => 420,
+                'mailer' => 'postmark',
+                'source_type' => 'job',
+                'source_label' => 'App\\Jobs\\GenerateInvoice',
+            ],
+            [
+                'class' => 'App\\Mail\\WeeklyDigest',
+                'subject' => 'Your weekly digest',
+                'base_duration' => 1_240,
+                'mailer' => 'ses',
+                'source_type' => 'schedule',
+                'source_label' => 'php artisan digest:weekly',
+            ],
+            [
+                'class' => 'App\\Mail\\PaymentReceived',
+                'subject' => 'Payment received',
+                'base_duration' => 180,
+                'mailer' => 'postmark',
+                'source_type' => 'job',
+                'source_label' => 'App\\Jobs\\ProcessPayment',
+            ],
+            [
+                'class' => 'App\\Mail\\AccountSuspended',
+                'subject' => 'Your account has been suspended',
+                'base_duration' => 220,
+                'mailer' => 'smtp',
+                'source_type' => 'command',
+                'source_label' => 'php artisan accounts:suspend',
+            ],
+        ];
+
+        $environments = ['production', 'production', 'production', 'staging'];
+        $rows = [];
+
+        foreach ($mailables as $tpl) {
+            $sends = random_int(40, 110);
+
+            for ($i = 0; $i < $sends; $i++) {
+                $jitter = random_int(-25, 220) / 100;
+                $duration = max(8, (int) round($tpl['base_duration'] * (1 + $jitter)));
+
+                $recipientsCount = random_int(1, 4);
+                $attachments = random_int(0, 100) <= 15 ? random_int(1, 3) : 0;
+
+                $offsetSeconds = random_int(0, 86_400);
+                $occurredAt = $start->addSeconds($offsetSeconds);
+
+                $rows[] = [
+                    'id' => (string) Str::uuid(),
+                    'project_id' => $project->id,
+                    'trace_id' => null,
+                    'mailable_class' => $tpl['class'],
+                    'mailer' => $tpl['mailer'],
+                    'subject' => $tpl['subject'],
+                    'from_address' => 'no-reply@acme.test',
+                    'from_name' => 'Acme',
+                    'recipients_to' => null,
+                    'recipients_cc' => null,
+                    'recipients_bcc' => null,
+                    'recipients_count' => $recipientsCount,
+                    'attachments_count' => $attachments,
+                    'queue' => $tpl['source_type'] === 'job' ? 'mail' : null,
+                    'status' => 'sent',
+                    'duration_ms' => $duration,
+                    'source_type' => $tpl['source_type'],
+                    'source_id' => null,
+                    'source_label' => $tpl['source_label'],
+                    'environment' => $environments[array_rand($environments)],
+                    'occurred_at' => $occurredAt,
+                    'created_at' => $occurredAt,
+                    'updated_at' => $occurredAt,
+                ];
+            }
+        }
+
+        foreach (array_chunk($rows, 200) as $chunk) {
+            MailSend::query()->insert($chunk);
+        }
+    }
+
+    private function seedNotifications(Project $project, CarbonImmutable $start): void
+    {
+        $notifications = [
+            [
+                'class' => 'App\\Notifications\\OrderShippedNotification',
+                'channels' => ['mail', 'database'],
+                'base_duration' => 240,
+                'source_type' => 'job',
+                'source_label' => 'App\\Jobs\\ShipOrder',
+            ],
+            [
+                'class' => 'App\\Notifications\\PaymentFailedNotification',
+                'channels' => ['mail', 'slack', 'database'],
+                'base_duration' => 320,
+                'source_type' => 'job',
+                'source_label' => 'App\\Jobs\\ProcessPayment',
+            ],
+            [
+                'class' => 'App\\Notifications\\NewCommentNotification',
+                'channels' => ['database', 'broadcast'],
+                'base_duration' => 60,
+                'source_type' => 'controller',
+                'source_label' => 'App\\Http\\Controllers\\CommentsController@store',
+            ],
+            [
+                'class' => 'App\\Notifications\\TwoFactorCodeNotification',
+                'channels' => ['mail', 'nexmo'],
+                'base_duration' => 140,
+                'source_type' => 'controller',
+                'source_label' => 'App\\Http\\Controllers\\Auth\\TwoFactorController@send',
+            ],
+            [
+                'class' => 'App\\Notifications\\SystemAlertNotification',
+                'channels' => ['slack'],
+                'base_duration' => 410,
+                'source_type' => 'schedule',
+                'source_label' => 'php artisan monitor:alerts',
+            ],
+            [
+                'class' => 'App\\Notifications\\InvoiceOverdueNotification',
+                'channels' => ['mail', 'database'],
+                'base_duration' => 280,
+                'source_type' => 'schedule',
+                'source_label' => 'php artisan invoices:remind',
+            ],
+        ];
+
+        $environments = ['production', 'production', 'production', 'staging'];
+        $rows = [];
+
+        foreach ($notifications as $tpl) {
+            $base = random_int(40, 110);
+
+            for ($i = 0; $i < $base; $i++) {
+                foreach ($tpl['channels'] as $channel) {
+                    $jitter = random_int(-30, 220) / 100;
+                    $duration = max(5, (int) round($tpl['base_duration'] * (1 + $jitter)));
+
+                    $offsetSeconds = random_int(0, 86_400);
+                    $occurredAt = $start->addSeconds($offsetSeconds);
+
+                    $rows[] = [
+                        'id' => (string) Str::uuid(),
+                        'project_id' => $project->id,
+                        'trace_id' => null,
+                        'notification_class' => $tpl['class'],
+                        'channel' => $channel,
+                        'notifiable_type' => 'App\\Models\\User',
+                        'notifiable_id' => (string) random_int(1, 1000),
+                        'queue' => $tpl['source_type'] === 'job' ? 'notifications' : null,
+                        'status' => 'sent',
+                        'duration_ms' => $duration,
+                        'source_type' => $tpl['source_type'],
+                        'source_id' => null,
+                        'source_label' => $tpl['source_label'],
+                        'environment' => $environments[array_rand($environments)],
+                        'occurred_at' => $occurredAt,
+                        'created_at' => $occurredAt,
+                        'updated_at' => $occurredAt,
+                    ];
+                }
+            }
+        }
+
+        foreach (array_chunk($rows, 200) as $chunk) {
+            NotificationSend::query()->insert($chunk);
         }
     }
 }
