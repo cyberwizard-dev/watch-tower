@@ -126,9 +126,12 @@ class EventStore
                     'last_occurrence_at' => $occurredAt,
                 ])->save();
             } else {
+                $nextDisplayNumber = (int) (ErrorGroup::where('project_id', $project->id)->max('display_number') ?? 0) + 1;
+
                 $group = ErrorGroup::create([
                     'project_id' => $project->id,
                     'fingerprint' => $fingerprint,
+                    'display_number' => $nextDisplayNumber,
                     'exception_class' => $exceptionClass,
                     'first_message' => $message,
                     'first_file' => $file,

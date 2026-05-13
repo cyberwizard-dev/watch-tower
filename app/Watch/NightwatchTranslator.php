@@ -95,7 +95,7 @@ class NightwatchTranslator
                 'message' => (string) ($r['message'] ?? ''),
                 'file' => (string) ($r['file'] ?? ''),
                 'line' => $this->intOrNull($r['line'] ?? null),
-                'trace' => $r['trace'] ?? null,
+                'trace' => $this->decodeMaybeJson($r['trace'] ?? null),
                 'user_id' => $this->stringOrNull($r['user'] ?? null),
                 'environment' => $this->stringOrNull($r['deploy'] ?? null),
                 'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
