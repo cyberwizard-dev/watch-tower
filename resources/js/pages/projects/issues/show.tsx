@@ -702,10 +702,10 @@ function ManagePanel({
                 <PanelRow label="Status">
                     <Select value={issue.status} onValueChange={onStatus}>
                         <SelectTrigger className="h-7 w-auto border-0 bg-transparent px-1 text-xs hover:bg-muted/50">
-                            <span className="inline-flex items-center gap-1.5">
-                                <Circle className={cn('h-2 w-2', statusDotColor(issue.status))} />
+                            <div className="inline-flex items-center gap-1.5">
+                                <Circle className={cn('h-2 w-2 shrink-0', statusDotColor(issue.status))} />
                                 <SelectValue />
-                            </span>
+                            </div>
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="unresolved">Open</SelectItem>
@@ -733,10 +733,10 @@ function ManagePanel({
                         onValueChange={(value) => onAssignee(value === 'unassigned' ? null : Number(value))}
                     >
                         <SelectTrigger className="h-7 w-auto border-0 bg-transparent px-1 text-xs hover:bg-muted/50">
-                            <span className="inline-flex items-center gap-1.5">
-                                <UserCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            <div className="inline-flex items-center gap-1.5">
+                                <UserCircle2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                 <SelectValue />
-                            </span>
+                            </div>
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="unassigned">Unassigned</SelectItem>

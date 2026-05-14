@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronUp, ExternalLink, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, Search } from 'lucide-react';
 import { useState } from 'react';
 
 import { PageHeader } from '@/components/page-header';
@@ -62,18 +62,14 @@ const STATUS_TABS = [
     { value: 'ignored', label: 'Ignored', countKey: null },
 ];
 
-const SORT_COLUMNS = [
-    { key: 'id', label: 'ID' },
-    { key: 'count', label: 'Count' },
-    { key: 'users', label: 'Users' },
-    { key: 'first_seen', label: 'First seen' },
-    { key: 'last_seen', label: 'Last seen' },
-] as const;
+const GRID_COLS =
+    'grid-cols-[32px_60px_36px_minmax(0,1fr)_72px_72px_88px_88px_120px_90px_90px_36px]';
 
 export default function IssuesIndex({ groups, filters, counts }: Props) {
     const { props } = usePage<SharedProps>();
     const projectSlug = props.currentProject?.slug ?? '';
     const [search, setSearch] = useState(filters.search);
+    const [selected, setSelected] = useState<Record<string, boolean>>({});
 
     const visit = (params: Record<string, string | null>) => {
         const url = new URL(window.location.href);
@@ -101,6 +97,23 @@ export default function IssuesIndex({ groups, filters, counts }: Props) {
         } else {
             visit({ sort: key, direction: 'desc' });
         }
+    };
+
+    const allChecked = groups.data.length > 0 && groups.data.every((row) => selected[row.id]);
+    const toggleAll = () => {
+        if (allChecked) {
+            setSelected({});
+        } else {
+            const next: Record<string, boolean> = {};
+            groups.data.forEach((row) => {
+                next[row.id] = true;
+            });
+            setSelected(next);
+        }
+    };
+
+    const toggleOne = (id: string) => {
+        setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
     };
 
     return (
@@ -142,14 +155,25 @@ export default function IssuesIndex({ groups, filters, counts }: Props) {
                 </div>
 
                 <Card className="overflow-hidden p-0">
-                    <div className="grid grid-cols-[40px_60px_50px_minmax(0,1fr)_90px_90px_120px_120px_120px_40px] items-center gap-4 border-b border-border bg-card px-4 py-2.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    <div
+                        className={cn(
+                            'grid items-center gap-4 border-b border-border bg-card px-4 py-2.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase',
+                            GRID_COLS,
+                        )}
+                    >
+                        <span className="flex items-center justify-center">
+                            <Checkbox checked={allChecked} onChange={toggleAll} />
+                        </span>
                         <SortHeader label="ID" sortKey="id" current={filters.sort} direction={filters.direction} onSort={onSort} />
+                        <span />
                         <span>Issue</span>
                         <SortHeader label="Count" sortKey="count" current={filters.sort} direction={filters.direction} onSort={onSort} align="right" />
                         <SortHeader label="Users" sortKey="users" current={filters.sort} direction={filters.direction} onSort={onSort} align="right" />
                         <SortHeader label="First seen" sortKey="first_seen" current={filters.sort} direction={filters.direction} onSort={onSort} align="right" />
                         <SortHeader label="Last seen" sortKey="last_seen" current={filters.sort} direction={filters.direction} onSort={onSort} align="right" />
                         <span>Assigned</span>
+                        <span>Status</span>
+                        <span>Priority</span>
                         <span />
                     </div>
 
@@ -158,7 +182,13 @@ export default function IssuesIndex({ groups, filters, counts }: Props) {
                     ) : (
                         <ul className="divide-y divide-border">
                             {groups.data.map((issue) => (
-                                <IssueRowItem key={issue.id} issue={issue} projectSlug={projectSlug} />
+                                <IssueRowItem
+                                    key={issue.id}
+                                    issue={issue}
+                                    projectSlug={projectSlug}
+                                    checked={!!selected[issue.id]}
+                                    onToggle={() => toggleOne(issue.id)}
+                                />
                             ))}
                         </ul>
                     )}
@@ -249,23 +279,43 @@ function SortHeader({
     );
 }
 
-function IssueRowItem({ issue, projectSlug }: { issue: IssueRow; projectSlug: string }) {
+function IssueRowItem({
+    issue,
+    projectSlug,
+    checked,
+    onToggle,
+}: {
+    issue: IssueRow;
+    projectSlug: string;
+    checked: boolean;
+    onToggle: () => void;
+}) {
     const href = issues.show([projectSlug, issue.display_number]).url;
 
     return (
-        <li className="grid grid-cols-[40px_60px_50px_minmax(0,1fr)_90px_90px_120px_120px_120px_40px] items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/30">
-            
+        <li
+            className={cn(
+                'grid items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/30',
+                GRID_COLS,
+            )}
+        >
+            <span className="flex items-center justify-center">
+                <Checkbox checked={checked} onChange={onToggle} />
+            </span>
+
             <Link href={href} className="font-mono text-xs text-muted-foreground hover:text-foreground">
                 {issue.display_number}
             </Link>
 
+            <Sparkline values={issue.sparkline} />
+
             <Link href={href} className="min-w-0">
-                <div className="text-sm font-medium text-foreground" title={issue.short_class}>
+                <div className="truncate text-sm font-medium text-foreground" title={issue.short_class}>
                     {issue.short_class}
                 </div>
-                <div className="font-mono text-[11px] text-muted-foreground" title={issue.first_message}>
+                <div className="truncate font-mono text-[11px] text-muted-foreground" title={issue.first_message}>
                     {issue.first_message || '—'}
-                </div>  
+                </div>
             </Link>
 
             <span className="text-right font-mono text-sm tabular-nums">{formatCount(issue.total_count)}</span>
@@ -277,14 +327,19 @@ function IssueRowItem({ issue, projectSlug }: { issue: IssueRow; projectSlug: st
                 {formatRelative(issue.last_occurrence_at)}
             </span>
 
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-2 truncate">
                 {issue.assigned_to ? (
-                    <Avatar name={issue.assigned_to.name} />
+                    <>
+                        <Avatar name={issue.assigned_to.name} />
+                        <span className="truncate text-xs">{issue.assigned_to.name}</span>
+                    </>
                 ) : (
                     <Avatar name="?" muted />
                 )}
-                {issue.assigned_to.name}
             </span>
+
+            <StatusBadge status={issue.status} />
+            <PriorityBadge priority={issue.priority} />
 
             <Link
                 href={href}
@@ -298,26 +353,24 @@ function IssueRowItem({ issue, projectSlug }: { issue: IssueRow; projectSlug: st
 }
 
 function Sparkline({ values }: { values: number[] }) {
-    if (!values || values.length === 0) {
-        return <span className="text-muted-foreground/40 text-[10px]">—</span>;
-    }
-
-    const max = Math.max(1, ...values);
-    const width = 44;
-    const height = 18;
-    const barWidth = width / values.length;
+    const data = values && values.length > 0 ? values : [0];
+    const max = Math.max(1, ...data);
+    const width = 28;
+    const height = 16;
+    const barWidth = width / data.length;
 
     return (
         <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="text-muted-foreground/60">
-            {values.map((value, i) => {
-                const h = (value / max) * height;
+            {data.map((value, i) => {
+                const h = Math.max(1, (value / max) * height);
                 return (
                     <rect
                         key={i}
                         x={i * barWidth}
                         y={height - h}
                         width={Math.max(1, barWidth - 1)}
-                        height={Math.max(1, h)}
+                        height={h}
+                        rx={0.5}
                         fill="currentColor"
                     />
                 );
@@ -326,12 +379,40 @@ function Sparkline({ values }: { values: number[] }) {
     );
 }
 
+function StatusBadge({ status }: { status: string }) {
+    const config: Record<string, { label: string; dot: string; text: string }> = {
+        unresolved: { label: 'Open', dot: 'bg-blue-500', text: 'text-foreground' },
+        resolved: { label: 'Resolved', dot: 'bg-emerald-500', text: 'text-foreground' },
+        ignored: { label: 'Ignored', dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
+    };
+    const c = config[status] ?? config.unresolved;
+    return (
+        <span className={cn('inline-flex items-center gap-1.5 text-xs', c.text)}>
+            <span className={cn('h-1.5 w-1.5 rounded-full', c.dot)} />
+            {c.label}
+        </span>
+    );
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+    const config: Record<string, { label: string; className: string }> = {
+        none: { label: 'None', className: 'text-muted-foreground' },
+        low: { label: 'Low', className: 'text-muted-foreground' },
+        medium: { label: 'Medium', className: 'text-amber-500' },
+        high: { label: 'High', className: 'text-rose-500' },
+    };
+    const c = config[priority] ?? config.none;
+    return <span className={cn('text-xs', c.className)}>{c.label}</span>;
+}
+
 function Avatar({ name, muted = false }: { name: string; muted?: boolean }) {
     return (
         <span
             className={cn(
                 'grid h-6 w-6 place-items-center rounded-full text-[10px] font-semibold',
-                muted ? 'border border-dashed border-muted-foreground/40 text-muted-foreground/60' : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300',
+                muted
+                    ? 'border border-dashed border-muted-foreground/40 text-muted-foreground/60'
+                    : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300',
             )}
             title={name}
         >
