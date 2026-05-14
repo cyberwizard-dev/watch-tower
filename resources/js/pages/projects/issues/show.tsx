@@ -340,6 +340,8 @@ function groupFrames(frames: StackFrame[]): FrameGroup[] {
         buffer = [];
     };
 
+    frames = frames || [];
+    
     frames.forEach((frame, i) => {
         if (i === frames.length - 1 && isEntrypoint(frame)) {
             flushVendor(i);

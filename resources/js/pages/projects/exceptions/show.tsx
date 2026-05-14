@@ -296,7 +296,9 @@ function groupFrames(frames: StackFrame[]): FrameGroup[] {
         buffer = [];
     };
 
-    frames.forEach((frame, i) => {
+    frames = frames || [];
+
+    frames?.forEach((frame, i) => {
         if (i === frames.length - 1 && isEntrypoint(frame)) {
             flushVendor(i);
             groups.push({ type: 'entry', frame, index: i });
