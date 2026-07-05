@@ -67,6 +67,9 @@ type ExceptionDetail = {
         stacktrace: StackFrame[];
         context: Record<string, unknown>;
         environment: string | null;
+        user_identifier: string | null;
+        user_email: string | null;
+        user_name: string | null;
         occurred_at: string | null;
     } | null;
     occurrence_list: OccurrenceListItem[];
@@ -192,6 +195,18 @@ function DetailsCard({ exception }: { exception: ExceptionDetail }) {
         {
             label: 'Servers',
             value: <span className="font-mono">{servers.length ? servers.join(', ') : '—'}</span>,
+        },
+        {
+            label: 'User ID',
+            value: <span className="font-mono">{exception.latest_occurrence?.user_identifier ?? '—'}</span>,
+        },
+        {
+            label: 'User Email',
+            value: <span className="font-mono">{exception.latest_occurrence?.user_email ?? '—'}</span>,
+        },
+        {
+            label: 'User Name',
+            value: <span className="font-mono">{exception.latest_occurrence?.user_name ?? '—'}</span>,
         },
     ];
 
