@@ -35,6 +35,8 @@ class EventStore
             'cache-event' => $this->storeCacheEvent($project, $event['data']),
             'command' => $this->storeCommand($project, $event['data']),
             'scheduled-task' => $this->storeScheduledTask($project, $event['data']),
+            'mail' => $this->storeMail($project, $event['data']),
+            'notification' => $this->storeNotification($project, $event['data']),
             default => null,
         };
     }
@@ -358,6 +360,62 @@ class EventStore
             'duration_ms' => $this->intOrNull($data['duration_ms'] ?? null),
             'threshold_ms' => $this->intOrNull($data['threshold_ms'] ?? null),
             'output' => $this->stringOrNull($data['output'] ?? null),
+            'environment' => $this->stringOrNull($data['environment'] ?? null),
+            'occurred_at' => $this->parseTimestamp($data['occurred_at'] ?? null),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function storeMail(Project $project, array $data): void
+    {
+        $trace = $this->resolveTrace($project, $data);
+
+        \App\Models\MailSend::create([
+            'project_id' => $project->id,
+            'trace_id' => $trace?->id,
+            'mailable_class' => (string) ($data['mailable_class'] ?? 'UnknownMail'),
+            'mailer' => (string) ($data['mailer'] ?? 'smtp'),
+            'subject' => (string) ($data['subject'] ?? ''),
+            'from_address' => (string) ($data['from_address'] ?? ''),
+            'from_name' => (string) ($data['from_name'] ?? ''),
+            'recipients_to' => $data['recipients_to'] ?? [],
+            'recipients_cc' => $data['recipients_cc'] ?? [],
+            'recipients_bcc' => $data['recipients_bcc'] ?? [],
+            'recipients_count' => (int) ($data['recipients_count'] ?? 1),
+            'attachments_count' => (int) ($data['attachments_count'] ?? 0),
+            'queue' => $this->stringOrNull($data['queue'] ?? null),
+            'status' => (string) ($data['status'] ?? 'sent'),
+            'duration_ms' => $this->intOrNull($data['duration_ms'] ?? null),
+            'source_type' => $this->stringOrNull($data['source_type'] ?? null),
+            'source_id' => $this->stringOrNull($data['source_id'] ?? null),
+            'source_label' => $this->stringOrNull($data['source_label'] ?? null),
+            'environment' => $this->stringOrNull($data['environment'] ?? null),
+            'occurred_at' => $this->parseTimestamp($data['occurred_at'] ?? null),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function storeNotification(Project $project, array $data): void
+    {
+        $trace = $this->resolveTrace($project, $data);
+
+        \App\Models\NotificationSend::create([
+            'project_id' => $project->id,
+            'trace_id' => $trace?->id,
+            'notification_class' => (string) ($data['notification_class'] ?? 'UnknownNotification'),
+            'channel' => (string) ($data['channel'] ?? 'mail'),
+            'notifiable_type' => (string) ($data['notifiable_type'] ?? ''),
+            'notifiable_id' => (string) ($data['notifiable_id'] ?? ''),
+            'queue' => $this->stringOrNull($data['queue'] ?? null),
+            'status' => (string) ($data['status'] ?? 'sent'),
+            'duration_ms' => $this->intOrNull($data['duration_ms'] ?? null),
+            'source_type' => $this->stringOrNull($data['source_type'] ?? null),
+            'source_id' => $this->stringOrNull($data['source_id'] ?? null),
+            'source_label' => $this->stringOrNull($data['source_label'] ?? null),
             'environment' => $this->stringOrNull($data['environment'] ?? null),
             'occurred_at' => $this->parseTimestamp($data['occurred_at'] ?? null),
         ]);

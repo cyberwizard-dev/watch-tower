@@ -30,6 +30,8 @@ class NightwatchTranslator
             'cache-event' => $this->translateCacheEvent($record),
             'command' => $this->translateCommand($record),
             'scheduled-task', 'scheduled_task', 'schedule' => $this->translateScheduledTask($record),
+            'mail', 'mail-send', 'mail_send' => $this->translateMail($record),
+            'notification', 'notification-send', 'notification_send' => $this->translateNotification($record),
             default => null,
         };
     }
@@ -301,6 +303,66 @@ class NightwatchTranslator
                 'duration_ms' => $this->microsToMillis($r['duration'] ?? null),
                 'threshold_ms' => $this->intOrNull($r['threshold_ms'] ?? null),
                 'output' => $this->stringOrNull($r['output'] ?? null),
+                'environment' => $this->stringOrNull($r['deploy'] ?? null),
+                'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @return array{type: string, id: string, data: array<string, mixed>}
+     */
+    private function translateMail(array $r): array
+    {
+        return [
+            'type' => 'mail',
+            'id' => (string) ($r['trace_id'] ?? ''),
+            'data' => [
+                'request_id' => $this->stringOrNull($r['trace_id'] ?? null),
+                'mailable_class' => (string) ($r['class'] ?? $r['mailable'] ?? 'UnknownMail'),
+                'mailer' => (string) ($r['mailer'] ?? 'smtp'),
+                'subject' => (string) ($r['subject'] ?? ''),
+                'from_address' => (string) ($r['from'] ?? ''),
+                'from_name' => (string) ($r['from_name'] ?? ''),
+                'recipients_to' => $this->decodeMaybeJson($r['to'] ?? []),
+                'recipients_cc' => $this->decodeMaybeJson($r['cc'] ?? []),
+                'recipients_bcc' => $this->decodeMaybeJson($r['bcc'] ?? []),
+                'recipients_count' => (int) ($r['recipients_count'] ?? 1),
+                'attachments_count' => (int) ($r['attachments_count'] ?? 0),
+                'queue' => $this->stringOrNull($r['queue'] ?? null),
+                'status' => (string) ($r['status'] ?? 'sent'),
+                'duration_ms' => $this->microsToMillis($r['duration'] ?? null),
+                'source_type' => $this->stringOrNull($r['execution_source'] ?? null),
+                'source_id' => $this->stringOrNull($r['execution_id'] ?? null),
+                'source_label' => $this->stringOrNull($r['execution_preview'] ?? null),
+                'environment' => $this->stringOrNull($r['deploy'] ?? null),
+                'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @return array{type: string, id: string, data: array<string, mixed>}
+     */
+    private function translateNotification(array $r): array
+    {
+        return [
+            'type' => 'notification',
+            'id' => (string) ($r['trace_id'] ?? ''),
+            'data' => [
+                'request_id' => $this->stringOrNull($r['trace_id'] ?? null),
+                'notification_class' => (string) ($r['class'] ?? $r['notification'] ?? 'UnknownNotification'),
+                'channel' => (string) ($r['channel'] ?? 'mail'),
+                'notifiable_type' => (string) ($r['notifiable_type'] ?? ''),
+                'notifiable_id' => (string) ($r['notifiable_id'] ?? ''),
+                'queue' => $this->stringOrNull($r['queue'] ?? null),
+                'status' => (string) ($r['status'] ?? 'sent'),
+                'duration_ms' => $this->microsToMillis($r['duration'] ?? null),
+                'source_type' => $this->stringOrNull($r['execution_source'] ?? null),
+                'source_id' => $this->stringOrNull($r['execution_id'] ?? null),
+                'source_label' => $this->stringOrNull($r['execution_preview'] ?? null),
                 'environment' => $this->stringOrNull($r['deploy'] ?? null),
                 'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
             ],
