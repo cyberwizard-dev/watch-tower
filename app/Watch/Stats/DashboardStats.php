@@ -18,7 +18,8 @@ class DashboardStats
      *   range: array{from: string, to: string, label: string},
      *   activity: array<string, mixed>,
      *   exceptions: array<string, mixed>,
-     *   jobs: array<string, mixed>
+     *   jobs: array<string, mixed>,
+     *   logs: array<string, mixed>
      * }
      */
     public function forProject(Project $project, TimeRange $range): array
@@ -32,6 +33,7 @@ class DashboardStats
             'activity' => $this->activity($project, $range),
             'exceptions' => $this->exceptions($project, $range),
             'jobs' => $this->jobs($project, $range),
+            'logs' => $this->logs($project, $range),
         ];
     }
 
@@ -254,5 +256,30 @@ class DashboardStats
         $index = (int) floor(($p) * (count($values) - 1));
 
         return (float) $values[$index];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function logs(Project $project, TimeRange $range): array
+    {
+        $logs = \App\Models\LogEntry::query()
+            ->where('project_id', $project->id)
+            ->whereBetween('occurred_at', [$range->from, $range->to]);
+
+        $stats = (clone $logs)
+            ->selectRaw('COUNT(*) AS total')
+            ->selectRaw("SUM(CASE WHEN level = 'error' OR level = 'critical' OR level = 'alert' OR level = 'emergency' THEN 1 ELSE 0 END) AS error")
+            ->selectRaw("SUM(CASE WHEN level = 'warning' OR level = 'notice' THEN 1 ELSE 0 END) AS warning")
+            ->selectRaw("SUM(CASE WHEN level = 'info' OR level = 'debug' THEN 1 ELSE 0 END) AS info")
+            ->first();
+
+        return [
+            'total' => (int) ($stats?->total ?? 0),
+            'error' => (int) ($stats?->error ?? 0),
+            'warning' => (int) ($stats?->warning ?? 0),
+            'info' => (int) ($stats?->info ?? 0),
+            'window_label' => $range->humanLabel(),
+        ];
     }
 }

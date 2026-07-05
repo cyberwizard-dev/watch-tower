@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { PartyPopper } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { AppLayout } from '@/layouts/app-layout';
+import logsRoutes from '@/routes/projects/logs';
+import type { SharedProps } from '@/types/inertia';
 
 type ActivityBucket = {
     bucket: string;
@@ -36,6 +38,13 @@ type DashboardStats = {
         buckets: ActivityBucket[];
     };
     exceptions: { total: number; window_label: string };
+    logs: {
+        total: number;
+        error: number;
+        warning: number;
+        info: number;
+        window_label: string;
+    };
     jobs: {
         total: number;
         failed: number;
@@ -81,11 +90,12 @@ export default function Dashboard({ stats, selectedRange }: Props) {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                         <CardTitle>Application</CardTitle>
-                        <span className="text-xs text-muted-foreground">Exceptions &amp; queue jobs</span>
+                        <span className="text-xs text-muted-foreground">Exceptions, logs, &amp; queue jobs</span>
                     </CardHeader>
                     <Separator />
-                    <CardContent className="grid gap-6 p-5 lg:grid-cols-2">
+                    <CardContent className="grid gap-6 p-5 lg:grid-cols-3">
                         <ExceptionsPanel exceptions={stats.exceptions} />
+                        <LogsPanel logs={stats.logs} />
                         <JobsPanel jobs={stats.jobs} />
                     </CardContent>
                 </Card>
@@ -181,6 +191,49 @@ function ExceptionsPanel({ exceptions }: { exceptions: DashboardStats['exception
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
                 Visit the Exceptions page for grouped stack traces, status, and frequency.
+            </p>
+        </div>
+    );
+}
+
+function LogsPanel({ logs }: { logs: DashboardStats['logs'] }) {
+    const { props } = usePage<SharedProps>();
+    const slug = props.currentProject?.slug ?? '';
+
+    if (logs.total === 0) {
+        return (
+            <div className="flex h-44 flex-col items-center justify-center rounded-md border border-dashed border-border text-center">
+                <PartyPopper className="h-7 w-7 text-emerald-500" />
+                <p className="mt-2 text-sm font-medium">No logs in {logs.window_label}</p>
+                <p className="text-xs text-muted-foreground">No log entries have been received</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex h-full flex-col">
+            <div className="flex items-baseline gap-3">
+                <span className="text-4xl font-semibold text-foreground">{formatNumber(logs.total)}</span>
+                <span className="text-xs text-muted-foreground">logs in {logs.window_label}</span>
+            </div>
+            
+            <div className="mt-4 flex-1 space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                    <span className="text-rose-600 dark:text-rose-400 font-medium">Errors:</span>
+                    <span className="font-mono">{formatNumber(logs.error)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                    <span className="text-amber-600 dark:text-amber-400 font-medium">Warnings:</span>
+                    <span className="font-mono">{formatNumber(logs.warning)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                    <span className="text-blue-600 dark:text-blue-400 font-medium">Info / Debug:</span>
+                    <span className="font-mono">{formatNumber(logs.info)}</span>
+                </div>
+            </div>
+
+            <p className="mt-3 text-[11px] text-muted-foreground">
+                Check the <a href={logsRoutes.index(slug).url} className="text-primary underline">Logs</a> page to search, filter, and drill down.
             </p>
         </div>
     );
