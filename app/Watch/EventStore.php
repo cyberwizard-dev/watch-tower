@@ -33,6 +33,8 @@ class EventStore
             'job' => $this->storeJob($project, $event['data']),
             'log' => $this->storeLog($project, $event['data']),
             'cache-event' => $this->storeCacheEvent($project, $event['data']),
+            'command' => $this->storeCommand($project, $event['data']),
+            'scheduled-task' => $this->storeScheduledTask($project, $event['data']),
             default => null,
         };
     }
@@ -318,5 +320,46 @@ class EventStore
         }
 
         return (string) $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function storeCommand(Project $project, array $data): void
+    {
+        \App\Models\CommandRun::create([
+            'project_id' => $project->id,
+            'command' => (string) ($data['command'] ?? 'unknown'),
+            'arguments' => $data['arguments'] ?? [],
+            'options' => $data['options'] ?? [],
+            'status' => (string) ($data['status'] ?? 'completed'),
+            'exit_code' => $this->intOrNull($data['exit_code'] ?? 0),
+            'duration_ms' => $this->intOrNull($data['duration_ms'] ?? null),
+            'output' => $this->stringOrNull($data['output'] ?? null),
+            'environment' => $this->stringOrNull($data['environment'] ?? null),
+            'occurred_at' => $this->parseTimestamp($data['occurred_at'] ?? null),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function storeScheduledTask(Project $project, array $data): void
+    {
+        \App\Models\ScheduledTaskRun::create([
+            'project_id' => $project->id,
+            'task' => (string) ($data['task'] ?? 'unknown'),
+            'task_hash' => (string) ($data['task_hash'] ?? md5($data['task'] ?? 'unknown')),
+            'schedule' => (string) ($data['schedule'] ?? ''),
+            'schedule_summary' => (string) ($data['schedule_summary'] ?? ''),
+            'next_run_at' => $this->parseTimestamp($data['next_run_at'] ?? null, allowNull: true),
+            'status' => (string) ($data['status'] ?? 'completed'),
+            'exit_code' => $this->intOrNull($data['exit_code'] ?? 0),
+            'duration_ms' => $this->intOrNull($data['duration_ms'] ?? null),
+            'threshold_ms' => $this->intOrNull($data['threshold_ms'] ?? null),
+            'output' => $this->stringOrNull($data['output'] ?? null),
+            'environment' => $this->stringOrNull($data['environment'] ?? null),
+            'occurred_at' => $this->parseTimestamp($data['occurred_at'] ?? null),
+        ]);
     }
 }

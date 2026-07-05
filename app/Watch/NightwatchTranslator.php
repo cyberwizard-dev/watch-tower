@@ -25,9 +25,11 @@ class NightwatchTranslator
             'request' => $this->translateRequest($record),
             'query' => $this->translateQuery($record),
             'exception' => $this->translateException($record),
-            'queued-job' => $this->translateQueuedJob($record),
+            'queued-job', 'job', 'job-run' => $this->translateQueuedJob($record),
             'log' => $this->translateLog($record),
             'cache-event' => $this->translateCacheEvent($record),
+            'command' => $this->translateCommand($record),
+            'scheduled-task', 'scheduled_task', 'schedule' => $this->translateScheduledTask($record),
             default => null,
         };
     }
@@ -249,5 +251,59 @@ class NightwatchTranslator
         }
 
         return (string) $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @return array{type: string, id: string, data: array<string, mixed>}
+     */
+    private function translateCommand(array $r): array
+    {
+        $exitCode = $this->intOrNull($r['exit_code'] ?? null) ?? 0;
+
+        return [
+            'type' => 'command',
+            'id' => (string) ($r['trace_id'] ?? ''),
+            'data' => [
+                'command' => (string) ($r['command'] ?? 'unknown'),
+                'arguments' => $this->decodeMaybeJson($r['arguments'] ?? []),
+                'options' => $this->decodeMaybeJson($r['options'] ?? []),
+                'status' => $exitCode === 0 ? 'completed' : 'failed',
+                'exit_code' => $exitCode,
+                'duration_ms' => $this->microsToMillis($r['duration'] ?? null),
+                'output' => $this->stringOrNull($r['output'] ?? null),
+                'environment' => $this->stringOrNull($r['deploy'] ?? null),
+                'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @return array{type: string, id: string, data: array<string, mixed>}
+     */
+    private function translateScheduledTask(array $r): array
+    {
+        $exitCode = $this->intOrNull($r['exit_code'] ?? null) ?? 0;
+        $task = (string) ($r['task'] ?? $r['command'] ?? 'unknown');
+
+        return [
+            'type' => 'scheduled-task',
+            'id' => (string) ($r['trace_id'] ?? ''),
+            'data' => [
+                'task' => $task,
+                'task_hash' => md5($task),
+                'schedule' => (string) ($r['schedule'] ?? ''),
+                'schedule_summary' => (string) ($r['schedule_summary'] ?? ''),
+                'next_run_at' => $this->timestampToIso($r['next_run_at'] ?? null),
+                'status' => $exitCode === 0 ? 'completed' : 'failed',
+                'exit_code' => $exitCode,
+                'duration_ms' => $this->microsToMillis($r['duration'] ?? null),
+                'threshold_ms' => $this->intOrNull($r['threshold_ms'] ?? null),
+                'output' => $this->stringOrNull($r['output'] ?? null),
+                'environment' => $this->stringOrNull($r['deploy'] ?? null),
+                'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
+            ],
+        ];
     }
 }
