@@ -2,16 +2,17 @@
 
 namespace App\Providers;
 
+use App\Models\ErrorOccurrence;
 use App\Models\Project;
 use App\Models\User;
-use App\Models\ErrorOccurrence;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -75,6 +76,17 @@ class AppServiceProvider extends ServiceProvider
                     return;
                 }
 
+                // Prevent duplicate / spam notifications for the same error group within 30 minutes
+                $cacheKey = 'error_group_alert_sent:'.$occurrence->error_group_id;
+                $isNewGroup = $occurrence->errorGroup && $occurrence->errorGroup->total_count === 1;
+                $shouldAlert = $isNewGroup || ! Cache::has($cacheKey);
+
+                if (! $shouldAlert) {
+                    return;
+                }
+
+                Cache::put($cacheKey, true, now()->addMinutes(30));
+
                 // Get target recipients for exception alerts
                 $recipients = [];
                 if ($envRecipient = env('MAIL_ALERT_RECIPIENT')) {
@@ -94,19 +106,19 @@ class AppServiceProvider extends ServiceProvider
                     $recipients = ['eminibest@gmail.com'];
                 }
 
-                $subject = "🚨 [WatchTower] New Exception in " . $project->name . " (" . $occurrence->environment . ")";
-                
+                $subject = '🚨 [WatchTower] New Exception in '.$project->name.' ('.$occurrence->environment.')';
+
                 $body = "
                 <div style='font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;'>
                     <h2 style='color: #dc2626; margin-top: 0;'>New Exception Detected</h2>
                     <p><strong>Project:</strong> {$project->name}</p>
-                    <p><strong>Environment:</strong> " . e($occurrence->environment) . "</p>
-                    <p><strong>Exception Class:</strong> <code>" . e($occurrence->exception_class) . "</code></p>
-                    <p><strong>Message:</strong> <span style='color: #4a5568;'>" . e($occurrence->message) . "</span></p>
-                    <p><strong>File:</strong> <code>" . e($occurrence->file) . ":" . e($occurrence->line) . "</code></p>
-                    <p><strong>Occurred At:</strong> " . e($occurrence->occurred_at) . "</p>
+                    <p><strong>Environment:</strong> ".e($occurrence->environment).'</p>
+                    <p><strong>Exception Class:</strong> <code>'.e($occurrence->exception_class)."</code></p>
+                    <p><strong>Message:</strong> <span style='color: #4a5568;'>".e($occurrence->message).'</span></p>
+                    <p><strong>File:</strong> <code>'.e($occurrence->file).':'.e($occurrence->line).'</code></p>
+                    <p><strong>Occurred At:</strong> '.e($occurrence->occurred_at)."</p>
                     <hr style='border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;'>
-                    <a href='" . config('app.url') . "/projects/{$project->id}/exceptions/{$occurrence->error_group_id}' 
+                    <a href='".config('app.url')."/projects/{$project->id}/exceptions/{$occurrence->error_group_id}' 
                        style='display: inline-block; background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;'>
                        View Exception in Dashboard
                     </a>
@@ -115,10 +127,10 @@ class AppServiceProvider extends ServiceProvider
 
                 Mail::html($body, function ($message) use ($recipients, $subject) {
                     $message->to($recipients)
-                            ->subject($subject);
+                        ->subject($subject);
                 });
             } catch (\Throwable $e) {
-                Log::error("Failed to send exception email alert: " . $e->getMessage());
+                Log::error('Failed to send exception email alert: '.$e->getMessage());
             }
         });
     }
