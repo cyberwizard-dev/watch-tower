@@ -117,7 +117,7 @@ class MailStats
      *   hash:string,
      *   totals: array{total:int,total_ms:float,min_ms:float|null,max_ms:float|null,avg_ms:float|null,p95_ms:float|null},
      *   buckets: list<array{bucket:string,count:int,avg_duration:float|null,p95_duration:float|null}>,
-     *   sends: list<array{id:string,subject:string|null,mailer:string|null,recipients_count:int,attachments_count:int,duration_ms:int|null,source_type:string|null,source_label:string|null,occurred_at:string|null}>
+     *   sends: list<array<string, mixed>>
      * }|null
      */
     public function mailDetail(Project $project, TimeRange $range, string $hash): ?array
@@ -153,6 +153,14 @@ class MailStats
                 'source_type',
                 'source_label',
                 'occurred_at',
+                'from_address',
+                'from_name',
+                'recipients_to',
+                'recipients_cc',
+                'recipients_bcc',
+                'queue',
+                'status',
+                'environment',
             ])
             ->map(fn (MailSend $row) => [
                 'id' => $row->id,
@@ -164,6 +172,14 @@ class MailStats
                 'source_type' => $row->source_type,
                 'source_label' => $row->source_label,
                 'occurred_at' => $row->occurred_at?->toIso8601String(),
+                'from_address' => $row->from_address,
+                'from_name' => $row->from_name,
+                'recipients_to' => $row->recipients_to,
+                'recipients_cc' => $row->recipients_cc,
+                'recipients_bcc' => $row->recipients_bcc,
+                'queue' => $row->queue,
+                'status' => $row->status,
+                'environment' => $row->environment,
             ])
             ->all();
 

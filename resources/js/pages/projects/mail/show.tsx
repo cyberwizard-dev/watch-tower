@@ -1,4 +1,5 @@
 import { usePage } from '@inertiajs/react';
+import { ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
 
@@ -30,6 +31,14 @@ type Send = {
     source_type: string | null;
     source_label: string | null;
     occurred_at: string | null;
+    from_address: string | null;
+    from_name: string | null;
+    recipients_to: string[] | null;
+    recipients_cc: string[] | null;
+    recipients_bcc: string[] | null;
+    queue: string | null;
+    status: string | null;
+    environment: string | null;
 };
 
 type Detail = {
@@ -59,6 +68,11 @@ export default function MailShow({ detail, selectedRange }: Props) {
     const slug = props.currentProject?.slug ?? '';
 
     const [filter, setFilter] = useState<Filter>('all');
+    const [expandedSendId, setExpandedSendId] = useState<string | null>(null);
+
+    const toggleExpand = (sendId: string) => {
+        setExpandedSendId(expandedSendId === sendId ? null : sendId);
+    };
 
     const filtered = useMemo(() => {
         if (filter === 'avg' && detail.totals.avg_ms !== null) {
@@ -120,7 +134,7 @@ export default function MailShow({ detail, selectedRange }: Props) {
                                     <TableHead className="w-24 text-[10px] font-semibold tracking-wider uppercase">Mailer</TableHead>
                                     <TableHead className="text-[10px] font-semibold tracking-wider uppercase">Subject</TableHead>
                                     <TableHead className="w-24 text-right text-[10px] font-semibold tracking-wider uppercase">Recipients</TableHead>
-                                    <TableHead className="w-24 text-right text-[10px] font-semibold tracking-wider uppercase">Duration</TableHead>
+                                    <TableHead className="w-28 text-right text-[10px] font-semibold tracking-wider uppercase">Duration</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -131,50 +145,138 @@ export default function MailShow({ detail, selectedRange }: Props) {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    filtered.map((send) => (
-                                        <TableRow key={send.id} className="hover:bg-muted/30">
-                                            <TableCell className="py-2.5 font-mono text-xs text-muted-foreground">
-                                                {formatStamp(send.occurred_at)}
-                                            </TableCell>
-                                            <TableCell className="py-2.5 font-mono text-xs">
-                                                {send.source_label ? (
-                                                    <span title={send.source_label} className="block max-w-[260px] truncate">
-                                                        {send.source_label}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground">—</span>
+                                    filtered.map((send) => {
+                                        const isExpanded = expandedSendId === send.id;
+                                        return (
+                                            <>
+                                                <TableRow
+                                                    key={send.id}
+                                                    onClick={() => toggleExpand(send.id)}
+                                                    className={cn(
+                                                        "cursor-pointer hover:bg-muted/50 transition-colors",
+                                                        isExpanded && "bg-muted/40 hover:bg-muted/40"
+                                                    )}
+                                                >
+                                                    <TableCell className="py-2.5 font-mono text-xs text-muted-foreground">
+                                                        {formatStamp(send.occurred_at)}
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5 font-mono text-xs">
+                                                        {send.source_label ? (
+                                                            <span title={send.source_label} className="block max-w-[260px] truncate">
+                                                                {send.source_label}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">—</span>
+                                                        )}
+                                                        {send.source_type ? (
+                                                            <span className="text-[10px] text-muted-foreground">{send.source_type}</span>
+                                                        ) : null}
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5">
+                                                        {send.mailer ? (
+                                                            <Badge variant="muted" className="font-mono text-[10px] uppercase">
+                                                                {send.mailer}
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">—</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5 text-xs">
+                                                        <span className="block max-w-[360px] truncate" title={send.subject ?? ''}>
+                                                            {send.subject ?? <span className="text-muted-foreground">—</span>}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5 text-right font-mono text-xs tabular-nums">
+                                                        {send.recipients_count}
+                                                    </TableCell>
+                                                    <TableCell className={cn(
+                                                        'py-2.5 text-right font-mono text-xs tabular-nums',
+                                                        detail.totals.p95_ms !== null && (send.duration_ms ?? 0) >= detail.totals.p95_ms
+                                                            ? 'text-amber-600 dark:text-amber-400'
+                                                            : '',
+                                                    )}>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <span>{formatMs(send.duration_ms)}</span>
+                                                            <ChevronRight className={cn(
+                                                                "h-3.5 w-3.5 text-muted-foreground/60 transition-transform",
+                                                                isExpanded && "rotate-90 text-foreground"
+                                                            )} />
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                                {isExpanded && (
+                                                    <TableRow className="bg-muted/5 hover:bg-transparent">
+                                                        <TableCell colSpan={6} className="p-4 border-t border-border/40">
+                                                            <div className="grid gap-6 md:grid-cols-2 text-left">
+                                                                {/* Column 1: Mail Envelope Routing */}
+                                                                <div className="space-y-3">
+                                                                    <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Envelope Headers</h4>
+                                                                    <div className="space-y-2 border border-border/40 rounded-md p-3 bg-background">
+                                                                        <div className="text-xs py-0.5">
+                                                                            <span className="text-muted-foreground block text-[10px] uppercase font-medium">From:</span>
+                                                                            <span className="font-semibold text-foreground select-all leading-relaxed">
+                                                                                {send.from_name ? `${send.from_name} <${send.from_address}>` : (send.from_address ?? '—')}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-xs py-0.5 border-t border-border/10 pt-2">
+                                                                            <span className="text-muted-foreground block text-[10px] uppercase font-medium">To (Recipients):</span>
+                                                                            <span className="font-mono text-[11px] text-foreground select-all break-all leading-normal whitespace-pre-wrap">
+                                                                                {Array.isArray(send.recipients_to) ? send.recipients_to.join(', ') : String(send.recipients_to ?? '—')}
+                                                                            </span>
+                                                                        </div>
+                                                                        {(send.recipients_cc && send.recipients_cc.length > 0) && (
+                                                                            <div className="text-xs py-0.5 border-t border-border/10 pt-2">
+                                                                                <span className="text-muted-foreground block text-[10px] uppercase font-medium">Cc:</span>
+                                                                                <span className="font-mono text-[11px] text-foreground select-all break-all">{send.recipients_cc.join(', ')}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {(send.recipients_bcc && send.recipients_bcc.length > 0) && (
+                                                                            <div className="text-xs py-0.5 border-t border-border/10 pt-2">
+                                                                                <span className="text-muted-foreground block text-[10px] uppercase font-medium">Bcc:</span>
+                                                                                <span className="font-mono text-[11px] text-foreground select-all break-all">{send.recipients_bcc.join(', ')}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Column 2: Mail Transmission Metadata */}
+                                                                <div className="space-y-3">
+                                                                    <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Delivery Metadata</h4>
+                                                                    <div className="space-y-1.5 border border-border/40 rounded-md p-3 bg-background">
+                                                                        <div className="flex justify-between text-xs py-0.5">
+                                                                            <span className="text-muted-foreground">Status:</span>
+                                                                            <span className={cn(
+                                                                                "font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border leading-none uppercase",
+                                                                                send.status === 'failed'
+                                                                                    ? 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                                                                                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                                                            )}>
+                                                                                {send.status ?? 'SENT'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex justify-between text-xs py-0.5 border-t border-border/10 pt-1.5">
+                                                                            <span className="text-muted-foreground">Queue Connection:</span>
+                                                                            <span className="font-mono text-xs text-foreground font-medium">{send.queue ?? 'sync (direct)'}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between text-xs py-0.5 border-t border-border/10 pt-1.5">
+                                                                            <span className="text-muted-foreground">Attachments count:</span>
+                                                                            <span className="font-mono text-xs text-foreground font-medium">{send.attachments_count}</span>
+                                                                        </div>
+                                                                        {send.environment && (
+                                                                            <div className="flex justify-between text-xs py-0.5 border-t border-border/10 pt-1.5">
+                                                                                <span className="text-muted-foreground">Environment:</span>
+                                                                                <span className="font-mono text-xs text-foreground">{send.environment}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
                                                 )}
-                                                {send.source_type ? (
-                                                    <span className="text-[10px] text-muted-foreground">{send.source_type}</span>
-                                                ) : null}
-                                            </TableCell>
-                                            <TableCell className="py-2.5">
-                                                {send.mailer ? (
-                                                    <Badge variant="muted" className="font-mono text-[10px]">
-                                                        {send.mailer}
-                                                    </Badge>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground">—</span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="py-2.5 text-xs">
-                                                <span className="block max-w-[360px] truncate" title={send.subject ?? ''}>
-                                                    {send.subject ?? <span className="text-muted-foreground">—</span>}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="py-2.5 text-right font-mono text-xs tabular-nums">
-                                                {send.recipients_count}
-                                            </TableCell>
-                                            <TableCell className={cn(
-                                                'py-2.5 text-right font-mono text-xs tabular-nums',
-                                                detail.totals.p95_ms !== null && (send.duration_ms ?? 0) >= detail.totals.p95_ms
-                                                    ? 'text-amber-600 dark:text-amber-400'
-                                                    : '',
-                                            )}>
-                                                {formatMs(send.duration_ms)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
+                                            </>
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
