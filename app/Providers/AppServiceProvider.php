@@ -6,7 +6,6 @@ use App\Models\ErrorOccurrence;
 use App\Models\Project;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -76,16 +75,12 @@ class AppServiceProvider extends ServiceProvider
                     return;
                 }
 
-                // Prevent duplicate / spam notifications for the same error group within 30 minutes
-                $cacheKey = 'error_group_alert_sent:'.$occurrence->error_group_id;
+                // Only send alert on the very first occurrence of this exception to prevent duplicate notification spam
                 $isNewGroup = $occurrence->errorGroup && $occurrence->errorGroup->total_count === 1;
-                $shouldAlert = $isNewGroup || ! Cache::has($cacheKey);
 
-                if (! $shouldAlert) {
+                if (! $isNewGroup) {
                     return;
                 }
-
-                Cache::put($cacheKey, true, now()->addMinutes(30));
 
                 // Get target recipients for exception alerts
                 $recipients = [];
@@ -130,6 +125,7 @@ class AppServiceProvider extends ServiceProvider
                         ->subject($subject);
                 });
             } catch (\Throwable $e) {
+                dump('MAIL EXCEPTION: '.$e->getMessage());
                 Log::error('Failed to send exception email alert: '.$e->getMessage());
             }
         });

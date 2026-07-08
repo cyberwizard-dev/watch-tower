@@ -6,6 +6,10 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 
+beforeEach(function () {
+    $this->withMiddleware();
+});
+
 function ingestToken(int|string $projectId, int $expiresInSeconds = 3600): string
 {
     return Crypt::encryptString(json_encode([
@@ -184,4 +188,42 @@ it('rejects payload with malformed JSON', function () {
         'HTTP_ACCEPT' => 'application/json',
     ], 'not valid json')
         ->assertStatus(400);
+});
+
+it('queues a translated client-request record', function () {
+    Queue::fake();
+    $project = Project::factory()->create();
+
+    $record = [
+        'v' => 1,
+        't' => 'client-request',
+        'timestamp' => 1762000000.123,
+        'trace_id' => 'trace-outgoing-123',
+        'method' => 'POST',
+        'uri' => 'https://api.stripe.com/v1/charges',
+        'response_status' => 201,
+        'duration' => 150000, // microseconds = 150ms
+        'execution_source' => 'request',
+        'execution_preview' => 'POST /api/checkout',
+        'deploy' => 'production',
+        'server' => 'web-1',
+    ];
+
+    postNightwatchRecords([$record], ingestToken($project->id))
+        ->assertOk()
+        ->assertJson(['records_received' => 1, 'records_queued' => 1]);
+
+    Queue::assertPushed(ProcessWatchEvent::class, function ($job) use ($project) {
+        return $job->projectId === $project->id
+            && $job->event['type'] === 'client-request'
+            && $job->event['data']['request_id'] === 'trace-outgoing-123'
+            && $job->event['data']['method'] === 'POST'
+            && $job->event['data']['host'] === 'api.stripe.com'
+            && $job->event['data']['url'] === 'https://api.stripe.com/v1/charges'
+            && $job->event['data']['status_code'] === 201
+            && $job->event['data']['duration_ms'] === 150
+            && $job->event['data']['source_type'] === 'request'
+            && $job->event['data']['source_label'] === 'POST /api/checkout'
+            && $job->event['data']['environment'] === 'production';
+    });
 });

@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\User;
 
 beforeEach(function () {
+    $this->withMiddleware();
     $this->user = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
     $this->project = Project::factory()->create();
     $this->group = ErrorGroup::factory()->create([

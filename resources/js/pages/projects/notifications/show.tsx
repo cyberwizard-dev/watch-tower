@@ -1,4 +1,5 @@
 import { usePage } from '@inertiajs/react';
+import { ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
 
@@ -27,6 +28,13 @@ type Send = {
     source_label: string | null;
     duration_ms: number | null;
     occurred_at: string | null;
+    notifiable_type: string | null;
+    notifiable_id: string | null;
+    queue: string | null;
+    status: string | null;
+    environment: string | null;
+    user_name: string | null;
+    user_email: string | null;
 };
 
 type Detail = {
@@ -56,6 +64,11 @@ export default function NotificationShow({ detail, selectedRange }: Props) {
     const slug = props.currentProject?.slug ?? '';
 
     const [filter, setFilter] = useState<Filter>('all');
+    const [expandedSendId, setExpandedSendId] = useState<string | null>(null);
+
+    const toggleExpand = (sendId: string) => {
+        setExpandedSendId(expandedSendId === sendId ? null : sendId);
+    };
 
     const filtered = useMemo(() => {
         if (filter === 'avg' && detail.totals.avg_ms !== null) {
@@ -116,48 +129,136 @@ export default function NotificationShow({ detail, selectedRange }: Props) {
                                     <TableHead className="text-[10px] font-semibold tracking-wider uppercase">Source</TableHead>
                                     <TableHead className="w-32 text-[10px] font-semibold tracking-wider uppercase">Channel</TableHead>
                                     <TableHead className="w-24 text-right text-[10px] font-semibold tracking-wider uppercase">Duration</TableHead>
+                                    <TableHead className="w-12" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filtered.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                                        <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
                                             No sends in this view.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    filtered.map((send) => (
-                                        <TableRow key={send.id} className="hover:bg-muted/30">
-                                            <TableCell className="py-2.5 font-mono text-xs text-muted-foreground">
-                                                {formatStamp(send.occurred_at)}
-                                            </TableCell>
-                                            <TableCell className="py-2.5 font-mono text-xs">
-                                                {send.source_label ? (
-                                                    <span title={send.source_label} className="block max-w-[360px] truncate">
-                                                        {send.source_label}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground">—</span>
+                                    filtered.map((send) => {
+                                        const isExpanded = expandedSendId === send.id;
+                                        return (
+                                            <>
+                                                <TableRow
+                                                    key={send.id}
+                                                    onClick={() => toggleExpand(send.id)}
+                                                    className={cn(
+                                                        "cursor-pointer hover:bg-muted/50 transition-colors",
+                                                        isExpanded && "bg-muted/40 hover:bg-muted/40"
+                                                    )}
+                                                >
+                                                    <TableCell className="py-2.5 font-mono text-xs text-muted-foreground">
+                                                        {formatStamp(send.occurred_at)}
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5 font-mono text-xs">
+                                                        {send.source_label ? (
+                                                            <span title={send.source_label} className="block max-w-[360px] truncate">
+                                                                {send.source_label}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">—</span>
+                                                        )}
+                                                        {send.source_type ? (
+                                                            <span className="text-[10px] text-muted-foreground">{send.source_type}</span>
+                                                        ) : null}
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5">
+                                                        <Badge variant="muted" className="font-mono text-[10px] uppercase">
+                                                            {send.channel}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className={cn(
+                                                        'py-2.5 text-right font-mono text-xs tabular-nums',
+                                                        detail.totals.p95_ms !== null && (send.duration_ms ?? 0) >= detail.totals.p95_ms
+                                                            ? 'text-amber-600 dark:text-amber-400'
+                                                            : '',
+                                                    )}>
+                                                        {formatMs(send.duration_ms)}
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5 text-right pr-4">
+                                                        <ChevronRight className={cn(
+                                                            "h-4 w-4 inline text-muted-foreground/60 transition-transform",
+                                                            isExpanded && "rotate-90 text-foreground"
+                                                        )} />
+                                                    </TableCell>
+                                                </TableRow>
+                                                {isExpanded && (
+                                                    <TableRow className="bg-muted/5 hover:bg-transparent">
+                                                        <TableCell colSpan={5} className="p-4 border-t border-border/40">
+                                                            <div className="grid gap-6 md:grid-cols-2 text-left">
+                                                                {/* Column 1: Notifiable Details */}
+                                                                <div className="space-y-3">
+                                                                    <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Recipient Info</h4>
+                                                                    <div className="space-y-1.5 border border-border/40 rounded-md p-3 bg-background">
+                                                                        {send.user_email ? (
+                                                                            <>
+                                                                                <div className="flex justify-between text-xs py-0.5">
+                                                                                    <span className="text-muted-foreground">User Email:</span>
+                                                                                    <span className="font-semibold text-foreground select-all text-right">{send.user_email}</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between text-xs py-0.5 border-t border-border/10 pt-1.5">
+                                                                                    <span className="text-muted-foreground">User Name:</span>
+                                                                                    <span className="font-medium text-foreground select-all text-right">{send.user_name ?? '—'}</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between text-xs py-0.5 border-t border-border/10 pt-1.5">
+                                                                                    <span className="text-muted-foreground">Notifiable:</span>
+                                                                                    <span className="font-mono text-[11px] text-muted-foreground break-all text-right">{send.notifiable_type} #{send.notifiable_id}</span>
+                                                                                </div>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <div className="flex justify-between text-xs py-0.5">
+                                                                                    <span className="text-muted-foreground">Notifiable Type:</span>
+                                                                                    <span className="font-mono text-[11px] font-medium break-all select-all text-foreground">{send.notifiable_type ?? '—'}</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between text-xs py-0.5 border-t border-border/10 pt-1.5">
+                                                                                    <span className="text-muted-foreground">Notifiable ID:</span>
+                                                                                    <span className="font-mono text-xs font-semibold select-all text-foreground">{send.notifiable_id ?? '—'}</span>
+                                                                                </div>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Column 2: Send Metadata */}
+                                                                <div className="space-y-3">
+                                                                    <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Metadata & Status</h4>
+                                                                    <div className="space-y-1.5 border border-border/40 rounded-md p-3 bg-background">
+                                                                        <div className="flex justify-between text-xs py-0.5">
+                                                                            <span className="text-muted-foreground">Status:</span>
+                                                                            <span className={cn(
+                                                                                "font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border leading-none uppercase",
+                                                                                send.status === 'failed'
+                                                                                    ? 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                                                                                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                                                            )}>
+                                                                                {send.status ?? 'SENT'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex justify-between text-xs py-0.5 border-t border-border/10 pt-1.5">
+                                                                            <span className="text-muted-foreground">Queue Connection:</span>
+                                                                            <span className="font-mono text-xs text-foreground font-medium">{send.queue ?? 'sync (direct)'}</span>
+                                                                        </div>
+                                                                        {send.environment && (
+                                                                            <div className="flex justify-between text-xs py-0.5 border-t border-border/10 pt-1.5">
+                                                                                <span className="text-muted-foreground">Environment:</span>
+                                                                                <span className="font-mono text-xs text-foreground">{send.environment}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
                                                 )}
-                                                {send.source_type ? (
-                                                    <span className="text-[10px] text-muted-foreground">{send.source_type}</span>
-                                                ) : null}
-                                            </TableCell>
-                                            <TableCell className="py-2.5">
-                                                <Badge variant="muted" className="font-mono text-[10px]">
-                                                    {send.channel}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className={cn(
-                                                'py-2.5 text-right font-mono text-xs tabular-nums',
-                                                detail.totals.p95_ms !== null && (send.duration_ms ?? 0) >= detail.totals.p95_ms
-                                                    ? 'text-amber-600 dark:text-amber-400'
-                                                    : '',
-                                            )}>
-                                                {formatMs(send.duration_ms)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
+                                            </>
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>

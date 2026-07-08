@@ -4,11 +4,13 @@ use App\Models\CacheEvent;
 use App\Models\ErrorGroup;
 use App\Models\ErrorOccurrence;
 use App\Models\LogEntry;
+use App\Models\OutgoingRequest;
 use App\Models\Project;
 use App\Models\Trace;
 use App\Models\TraceQuery;
 use App\Watch\EventStore;
 use App\Watch\Fingerprinter;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 beforeEach(function () {
@@ -184,4 +186,80 @@ it('attaches queries to traces by correlation id and skips orphan queries', func
     $query = TraceQuery::first();
     expect($query->query_type)->toBe('SELECT')
         ->and($query->is_slow)->toBeTrue();
+});
+
+it('only sends an email alert on the very first occurrence of an exception', function () {
+    Mail::shouldReceive('html')
+        ->once()
+        ->with(
+            Mockery::any(),
+            Mockery::on(function ($closure) {
+                return true;
+            })
+        );
+
+    // Store first occurrence
+    $this->store->store($this->project, [
+        'type' => 'exception',
+        'data' => [
+            'class' => 'RuntimeException',
+            'file' => 'app/Controller.php',
+            'line' => 10,
+            'message' => 'Something went wrong',
+            'environment' => 'production',
+        ],
+    ]);
+
+    // Store second occurrence of the same exception
+    $this->store->store($this->project, [
+        'type' => 'exception',
+        'data' => [
+            'class' => 'RuntimeException',
+            'file' => 'app/Controller.php',
+            'line' => 10,
+            'message' => 'Something went wrong again',
+            'environment' => 'production',
+        ],
+    ]);
+});
+
+it('stores client requests and links them to a trace by correlation id', function () {
+    $correlationId = (string) Str::uuid();
+
+    // First, store the request (trace)
+    $this->store->store($this->project, [
+        'type' => 'request',
+        'data' => ['request_id' => $correlationId, 'method' => 'GET', 'uri' => '/home'],
+    ]);
+
+    $trace = Trace::where('correlation_id', $correlationId)->first();
+
+    // Now store the client request (outgoing request)
+    $this->store->store($this->project, [
+        'type' => 'client-request',
+        'data' => [
+            'request_id' => $correlationId,
+            'method' => 'POST',
+            'host' => 'api.stripe.com',
+            'url' => 'https://api.stripe.com/v1/charges',
+            'status_code' => 200,
+            'duration_ms' => 120,
+            'source_type' => 'request',
+            'source_label' => 'GET /home',
+            'environment' => 'production',
+        ],
+    ]);
+
+    expect(OutgoingRequest::where('project_id', $this->project->id)->count())->toBe(1);
+
+    $outgoing = OutgoingRequest::where('project_id', $this->project->id)->first();
+    expect($outgoing->trace_id)->toBe($trace->id)
+        ->and($outgoing->method)->toBe('POST')
+        ->and($outgoing->host)->toBe('api.stripe.com')
+        ->and($outgoing->url)->toBe('https://api.stripe.com/v1/charges')
+        ->and($outgoing->status_code)->toBe(200)
+        ->and($outgoing->duration_ms)->toBe(120)
+        ->and($outgoing->source_type)->toBe('request')
+        ->and($outgoing->source_label)->toBe('GET /home')
+        ->and($outgoing->environment)->toBe('production');
 });

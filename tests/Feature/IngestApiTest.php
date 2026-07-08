@@ -5,6 +5,10 @@ use App\Models\Project;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
+beforeEach(function () {
+    $this->withMiddleware();
+});
+
 it('rejects requests without an API key', function () {
     $this->postJson('/api/ingest', [
         'events' => [['type' => 'request', 'data' => []]],

@@ -117,7 +117,7 @@ class NotificationStats
      *   hash:string,
      *   totals: array{total:int,total_ms:float,min_ms:float|null,max_ms:float|null,avg_ms:float|null,p95_ms:float|null},
      *   buckets: list<array{bucket:string,count:int,avg_duration:float|null,p95_duration:float|null}>,
-     *   sends: list<array{id:string,channel:string,source_type:string|null,source_label:string|null,duration_ms:int|null,occurred_at:string|null}>
+     *   sends: list<array<string, mixed>>
      * }|null
      */
     public function notificationDetail(Project $project, TimeRange $range, string $hash): ?array
@@ -138,18 +138,29 @@ class NotificationStats
         $summary = $this->summary($project, $range, $notificationClass);
 
         $sends = NotificationSend::query()
-            ->where('project_id', $project->id)
-            ->where('notification_class', $notificationClass)
-            ->whereBetween('occurred_at', [$range->from, $range->to])
-            ->orderByDesc('occurred_at')
+            ->leftJoin('users', function ($join) {
+                $join->on('notification_sends.notifiable_id', '=', 'users.id')
+                    ->where('notification_sends.notifiable_type', '=', 'App\\Models\\User');
+            })
+            ->where('notification_sends.project_id', $project->id)
+            ->where('notification_sends.notification_class', $notificationClass)
+            ->whereBetween('notification_sends.occurred_at', [$range->from, $range->to])
+            ->orderByDesc('notification_sends.occurred_at')
             ->limit(200)
             ->get([
-                'id',
-                'channel',
-                'source_type',
-                'source_label',
-                'duration_ms',
-                'occurred_at',
+                'notification_sends.id',
+                'notification_sends.channel',
+                'notification_sends.source_type',
+                'notification_sends.source_label',
+                'notification_sends.duration_ms',
+                'notification_sends.occurred_at',
+                'notification_sends.notifiable_type',
+                'notification_sends.notifiable_id',
+                'notification_sends.queue',
+                'notification_sends.status',
+                'notification_sends.environment',
+                'users.name as user_name',
+                'users.email as user_email',
             ])
             ->map(fn (NotificationSend $row) => [
                 'id' => $row->id,
@@ -158,6 +169,13 @@ class NotificationStats
                 'source_label' => $row->source_label,
                 'duration_ms' => $row->duration_ms,
                 'occurred_at' => $row->occurred_at?->toIso8601String(),
+                'notifiable_type' => $row->notifiable_type,
+                'notifiable_id' => $row->notifiable_id,
+                'queue' => $row->queue,
+                'status' => $row->status,
+                'environment' => $row->environment,
+                'user_name' => $row->user_name,
+                'user_email' => $row->user_email,
             ])
             ->all();
 

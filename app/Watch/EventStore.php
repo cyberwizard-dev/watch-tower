@@ -3,12 +3,17 @@
 namespace App\Watch;
 
 use App\Models\CacheEvent;
+use App\Models\CommandRun;
 use App\Models\ErrorGroup;
 use App\Models\ErrorOccurrence;
 use App\Models\EventOccurrence;
 use App\Models\LogEntry;
+use App\Models\MailSend;
+use App\Models\NotificationSend;
+use App\Models\OutgoingRequest;
 use App\Models\Project;
 use App\Models\QueueJobRun;
+use App\Models\ScheduledTaskRun;
 use App\Models\Trace;
 use App\Models\TraceQuery;
 use Carbon\CarbonImmutable;
@@ -37,6 +42,7 @@ class EventStore
             'scheduled-task' => $this->storeScheduledTask($project, $event['data']),
             'mail' => $this->storeMail($project, $event['data']),
             'notification' => $this->storeNotification($project, $event['data']),
+            'client-request', 'outgoing-request' => $this->storeClientRequest($project, $event['data']),
             default => null,
         };
     }
@@ -329,7 +335,7 @@ class EventStore
      */
     private function storeCommand(Project $project, array $data): void
     {
-        \App\Models\CommandRun::create([
+        CommandRun::create([
             'project_id' => $project->id,
             'command' => (string) ($data['command'] ?? 'unknown'),
             'arguments' => $data['arguments'] ?? [],
@@ -348,7 +354,7 @@ class EventStore
      */
     private function storeScheduledTask(Project $project, array $data): void
     {
-        \App\Models\ScheduledTaskRun::create([
+        ScheduledTaskRun::create([
             'project_id' => $project->id,
             'task' => (string) ($data['task'] ?? 'unknown'),
             'task_hash' => (string) ($data['task_hash'] ?? md5($data['task'] ?? 'unknown')),
@@ -372,7 +378,7 @@ class EventStore
     {
         $trace = $this->resolveTrace($project, $data);
 
-        \App\Models\MailSend::create([
+        MailSend::create([
             'project_id' => $project->id,
             'trace_id' => $trace?->id,
             'mailable_class' => (string) ($data['mailable_class'] ?? 'UnknownMail'),
@@ -403,7 +409,7 @@ class EventStore
     {
         $trace = $this->resolveTrace($project, $data);
 
-        \App\Models\NotificationSend::create([
+        NotificationSend::create([
             'project_id' => $project->id,
             'trace_id' => $trace?->id,
             'notification_class' => (string) ($data['notification_class'] ?? 'UnknownNotification'),
@@ -413,6 +419,31 @@ class EventStore
             'queue' => $this->stringOrNull($data['queue'] ?? null),
             'status' => (string) ($data['status'] ?? 'sent'),
             'duration_ms' => $this->intOrNull($data['duration_ms'] ?? null),
+            'source_type' => $this->stringOrNull($data['source_type'] ?? null),
+            'source_id' => $this->stringOrNull($data['source_id'] ?? null),
+            'source_label' => $this->stringOrNull($data['source_label'] ?? null),
+            'environment' => $this->stringOrNull($data['environment'] ?? null),
+            'occurred_at' => $this->parseTimestamp($data['occurred_at'] ?? null),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function storeClientRequest(Project $project, array $data): void
+    {
+        $trace = $this->resolveTrace($project, $data);
+
+        OutgoingRequest::create([
+            'project_id' => $project->id,
+            'trace_id' => $trace?->id,
+            'method' => (string) ($data['method'] ?? 'GET'),
+            'host' => (string) ($data['host'] ?? 'unknown'),
+            'url' => (string) ($data['url'] ?? ''),
+            'status_code' => $this->intOrNull($data['status_code'] ?? null),
+            'duration_ms' => $this->intOrNull($data['duration_ms'] ?? null),
+            'request_size_bytes' => $this->intOrNull($data['request_size_bytes'] ?? null),
+            'response_size_bytes' => $this->intOrNull($data['response_size_bytes'] ?? null),
             'source_type' => $this->stringOrNull($data['source_type'] ?? null),
             'source_id' => $this->stringOrNull($data['source_id'] ?? null),
             'source_label' => $this->stringOrNull($data['source_label'] ?? null),

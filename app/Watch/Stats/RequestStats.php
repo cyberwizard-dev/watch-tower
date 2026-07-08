@@ -105,7 +105,7 @@ class RequestStats
      *   totals: array{total:int, success:int, client_error:int, server_error:int},
      *   duration: array{avg_ms: float|null, p95_ms: float|null},
      *   buckets: list<array{bucket:string,success:int,client_error:int,server_error:int,avg_duration:float|null,p95_duration:float|null}>,
-     *   recent: list<array{id:string,status_code:int|null,duration_ms:int|null,occurred_at:string|null,user_identifier:string|null}>
+     *   recent: list<array<string, mixed>>
      * }|null
      */
     public function routeDetail(Project $project, TimeRange $range, string $method, string $uri, ?string $userId = null): ?array
@@ -134,7 +134,12 @@ class RequestStats
         $recent = (clone $base)
             ->orderByDesc('occurred_at')
             ->limit(20)
-            ->get(['id', 'method', 'uri', 'status_code', 'duration_ms', 'occurred_at', 'user_identifier'])
+            ->get([
+                'id', 'method', 'uri', 'status_code', 'duration_ms', 'occurred_at',
+                'user_identifier', 'user_email', 'user_name', 'ip_address', 'user_agent',
+                'headers', 'request_data', 'response_data', 'memory_used_kb', 'memory_peak_kb',
+                'db_queries_count', 'db_time_ms', 'environment', 'release_version', 'hostname'
+            ])
             ->map(fn (Trace $trace) => [
                 'id' => $trace->id,
                 'method' => $trace->method,
@@ -143,6 +148,20 @@ class RequestStats
                 'duration_ms' => $trace->duration_ms,
                 'occurred_at' => $trace->occurred_at?->toIso8601String(),
                 'user_identifier' => $trace->user_identifier,
+                'user_email' => $trace->user_email,
+                'user_name' => $trace->user_name,
+                'ip_address' => $trace->ip_address,
+                'user_agent' => $trace->user_agent,
+                'headers' => $trace->headers,
+                'request_data' => $trace->request_data,
+                'response_data' => $trace->response_data,
+                'memory_used_kb' => $trace->memory_used_kb,
+                'memory_peak_kb' => $trace->memory_peak_kb,
+                'db_queries_count' => $trace->db_queries_count,
+                'db_time_ms' => $trace->db_time_ms,
+                'environment' => $trace->environment,
+                'release_version' => $trace->release_version,
+                'hostname' => $trace->hostname,
             ])
             ->all();
 

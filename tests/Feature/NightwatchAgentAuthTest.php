@@ -3,6 +3,10 @@
 use App\Models\Project;
 use Illuminate\Support\Facades\Crypt;
 
+beforeEach(function () {
+    $this->withMiddleware();
+});
+
 it('rejects agent-auth without a bearer token', function () {
     $this->postJson('/api/agent-auth', [])
         ->assertStatus(401)

@@ -32,6 +32,7 @@ class NightwatchTranslator
             'scheduled-task', 'scheduled_task', 'schedule' => $this->translateScheduledTask($record),
             'mail', 'mail-send', 'mail_send' => $this->translateMail($record),
             'notification', 'notification-send', 'notification_send' => $this->translateNotification($record),
+            'client-request', 'client_request' => $this->translateClientRequest($record),
             default => null,
         };
     }
@@ -287,7 +288,7 @@ class NightwatchTranslator
     private function translateScheduledTask(array $r): array
     {
         $exitCode = $this->intOrNull($r['exit_code'] ?? null) ?? 0;
-        $task = (string) ($r['task'] ?? $r['command'] ?? 'unknown');
+        $task = (string) ($r['task'] ?? $r['description'] ?? $r['command'] ?? 'unknown');
 
         return [
             'type' => 'scheduled-task',
@@ -295,7 +296,7 @@ class NightwatchTranslator
             'data' => [
                 'task' => $task,
                 'task_hash' => md5($task),
-                'schedule' => (string) ($r['schedule'] ?? ''),
+                'schedule' => (string) ($r['schedule'] ?? $r['expression'] ?? ''),
                 'schedule_summary' => (string) ($r['schedule_summary'] ?? ''),
                 'next_run_at' => $this->timestampToIso($r['next_run_at'] ?? null),
                 'status' => $exitCode === 0 ? 'completed' : 'failed',
@@ -364,6 +365,36 @@ class NightwatchTranslator
                 'source_id' => $this->stringOrNull($r['execution_id'] ?? null),
                 'source_label' => $this->stringOrNull($r['execution_preview'] ?? null),
                 'environment' => $this->stringOrNull($r['deploy'] ?? null),
+                'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @return array{type: string, id: string, data: array<string, mixed>}
+     */
+    private function translateClientRequest(array $r): array
+    {
+        $url = (string) ($r['uri'] ?? $r['url'] ?? '');
+        $host = parse_url($url, PHP_URL_HOST) ?: 'unknown';
+
+        return [
+            'type' => 'client-request',
+            'id' => (string) ($r['trace_id'] ?? ''),
+            'data' => [
+                'request_id' => $this->stringOrNull($r['trace_id'] ?? null),
+                'method' => (string) ($r['method'] ?? 'GET'),
+                'host' => $host,
+                'url' => $url,
+                'status_code' => $this->intOrNull($r['status_code'] ?? $r['response_status'] ?? null),
+                'duration_ms' => isset($r['duration_ms']) ? (int) $r['duration_ms'] : $this->microsToMillis($r['duration'] ?? null),
+                'request_size_bytes' => $this->intOrNull($r['request_size_bytes'] ?? $r['request_size'] ?? null),
+                'response_size_bytes' => $this->intOrNull($r['response_size_bytes'] ?? $r['response_size'] ?? null),
+                'source_type' => $this->stringOrNull($r['execution_source'] ?? $r['source_type'] ?? null),
+                'source_id' => $this->stringOrNull($r['execution_id'] ?? $r['source_id'] ?? null),
+                'source_label' => $this->stringOrNull($r['execution_preview'] ?? $r['source_label'] ?? null),
+                'environment' => $this->stringOrNull($r['deploy'] ?? $r['environment'] ?? null),
                 'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
             ],
         ];

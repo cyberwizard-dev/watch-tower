@@ -163,13 +163,14 @@ class ScheduledTaskStats
         $runs = (clone $base)
             ->orderByDesc('occurred_at')
             ->limit(200)
-            ->get(['id', 'status', 'duration_ms', 'exit_code', 'occurred_at'])
+            ->get(['id', 'status', 'duration_ms', 'exit_code', 'occurred_at', 'output'])
             ->map(fn (ScheduledTaskRun $run) => [
                 'id' => $run->id,
                 'status' => $run->status,
                 'duration_ms' => $run->duration_ms,
                 'exit_code' => $run->exit_code,
                 'occurred_at' => $run->occurred_at?->toIso8601String(),
+                'output' => $run->output,
             ])
             ->all();
 

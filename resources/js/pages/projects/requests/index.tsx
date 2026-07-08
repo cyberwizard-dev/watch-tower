@@ -363,6 +363,8 @@ function DurationCard({ summary }: { summary: Summary }) {
 }
 
 function RouteDetailPanel({ detail, onClose }: { detail: RouteDetail; onClose: () => void }) {
+    const [selectedTrace, setSelectedTrace] = useState<any>(null);
+
     const reqData = detail.buckets.map((b) => ({
         time: formatTime(b.bucket),
         '1/2/3XX': b.success,
@@ -454,32 +456,47 @@ function RouteDetailPanel({ detail, onClose }: { detail: RouteDetail; onClose: (
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="w-20">Status</TableHead>
-                                        <TableHead className="text-right">Duration</TableHead>
+                                        <TableHead className="text-right w-24">Duration</TableHead>
                                         <TableHead>User</TableHead>
-                                        <TableHead>When</TableHead>
+                                        <TableHead className="w-28">When</TableHead>
+                                        <TableHead className="w-8" />
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {detail.recent.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                                            <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
                                                 No recent requests
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         detail.recent.map((trace) => (
-                                            <TableRow key={trace.id}>
+                                            <TableRow
+                                                key={trace.id}
+                                                className="group cursor-pointer hover:bg-muted/50 transition-colors"
+                                                onClick={() => setSelectedTrace(trace)}
+                                            >
                                                 <TableCell className="py-2">
                                                     <StatusBadge status={trace.status_code} />
                                                 </TableCell>
                                                 <TableCell className="py-2 text-right font-mono text-xs">
                                                     {formatMs(trace.duration_ms)}
                                                 </TableCell>
-                                                <TableCell className="py-2 font-mono text-xs text-muted-foreground">
-                                                    {trace.user_identifier ?? '—'}
+                                                <TableCell className="py-2 text-xs">
+                                                    {trace.user_email ? (
+                                                        <div className="flex flex-col select-text">
+                                                            <span className="font-medium text-foreground leading-normal">{trace.user_email}</span>
+                                                            <span className="font-mono text-[10px] text-muted-foreground/80 leading-none mt-0.5">ID: {trace.user_identifier}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="font-mono text-xs text-muted-foreground select-text">{trace.user_identifier ?? '—'}</span>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="py-2 text-xs text-muted-foreground">
                                                     {formatRelative(trace.occurred_at)}
+                                                </TableCell>
+                                                <TableCell className="py-2 text-right pr-4">
+                                                    <ChevronRight className="h-4 w-4 inline text-muted-foreground/50 group-hover:text-foreground transition-colors" />
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -490,7 +507,169 @@ function RouteDetailPanel({ detail, onClose }: { detail: RouteDetail; onClose: (
                     </Card>
                 </div>
             </aside>
+
+            {selectedTrace ? (
+                <TraceDetailPanel trace={selectedTrace} onClose={() => setSelectedTrace(null)} />
+            ) : null}
         </>
+    );
+}
+
+function TraceDetailPanel({ trace, onClose }: { trace: any; onClose: () => void }) {
+    const [activeTab, setActiveTab] = useState<'overview' | 'payload' | 'headers'>('overview');
+
+    if (!trace) return null;
+
+    return (
+        <>
+            <div className="fixed inset-0 z-[60] bg-background/60 backdrop-blur-sm" onClick={onClose} />
+            <aside className="fixed inset-y-0 right-0 z-[70] flex w-full max-w-xl flex-col border-l border-border bg-background shadow-2xl">
+                <div className="flex items-start justify-between border-b border-border px-6 py-4">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <MethodBadge method={trace.method} />
+                            <StatusBadge status={trace.status_code} />
+                            <span className="font-mono text-xs text-muted-foreground">{formatMs(trace.duration_ms)}</span>
+                        </div>
+                        <div className="font-mono text-xs break-all select-all pr-4">{trace.uri}</div>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+
+                {/* Tabs Header */}
+                <div className="border-b border-border bg-muted/20 px-6">
+                    <div className="flex gap-4">
+                        {(['overview', 'payload', 'headers'] as const).map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={cn(
+                                    'py-3 text-xs font-medium capitalize border-b-2 transition-colors',
+                                    activeTab === tab
+                                        ? 'border-primary text-foreground'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                                )}
+                            >
+                                {tab}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {activeTab === 'overview' && (
+                        <div className="space-y-6">
+                            {/* User details */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">User / Client Info</CardTitle>
+                                </CardHeader>
+                                <Separator />
+                                <CardContent className="p-4 space-y-3">
+                                    <DetailRow label="User ID" value={trace.user_identifier} font />
+                                    <DetailRow label="Email" value={trace.user_email} />
+                                    <DetailRow label="Name" value={trace.user_name} />
+                                    <DetailRow label="IP Address" value={trace.ip_address} font />
+                                    <DetailRow label="User Agent" value={trace.user_agent} className="text-xs break-words text-left" />
+                                </CardContent>
+                            </Card>
+
+                            {/* Performance metrics */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">Performance & Metadata</CardTitle>
+                                </CardHeader>
+                                <Separator />
+                                <CardContent className="p-4 space-y-3">
+                                    <DetailRow label="Duration" value={formatMs(trace.duration_ms)} font />
+                                    <DetailRow label="Database Queries" value={trace.db_queries_count !== null ? `${trace.db_queries_count} queries` : null} />
+                                    <DetailRow label="Database Time" value={trace.db_time_ms !== null ? `${trace.db_time_ms} ms` : null} font />
+                                    <DetailRow label="Memory Used" value={trace.memory_used_kb ? `${(trace.memory_used_kb / 1024).toFixed(1)} MB` : null} font />
+                                    <DetailRow label="Memory Peak" value={trace.memory_peak_kb ? `${(trace.memory_peak_kb / 1024).toFixed(1)} MB` : null} font />
+                                    <DetailRow label="Environment" value={trace.environment} />
+                                    <DetailRow label="Release" value={trace.release_version} font />
+                                    <DetailRow label="Hostname" value={trace.hostname} font />
+                                    <DetailRow label="Occurred At" value={trace.occurred_at ? formatUtc(trace.occurred_at) : null} font />
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+
+                    {activeTab === 'payload' && (
+                        <div className="space-y-6">
+                            {/* Request data */}
+                            <div>
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Request Body (Payload)</h4>
+                                {trace.request_data && Object.keys(trace.request_data).length > 0 ? (
+                                    <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed max-h-64 overflow-y-auto text-left select-text">
+                                        {JSON.stringify(trace.request_data, null, 2)}
+                                    </pre>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground italic border rounded-md p-3 bg-muted/10 text-left">No request body payload</p>
+                                )}
+                            </div>
+
+                            {/* Response data */}
+                            <div>
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Response Body (Payload)</h4>
+                                {trace.response_data && Object.keys(trace.response_data).length > 0 ? (
+                                    <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed max-h-64 overflow-y-auto text-left select-text">
+                                        {JSON.stringify(trace.response_data, null, 2)}
+                                    </pre>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground italic border rounded-md p-3 bg-muted/10 text-left">No response body payload</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'headers' && (
+                        <div className="space-y-4">
+                            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-left">HTTP Headers</h4>
+                            {trace.headers && Object.keys(trace.headers).length > 0 ? (
+                                <div className="border border-border rounded-md overflow-hidden text-left">
+                                    <Table>
+                                        <TableHeader className="bg-muted/20">
+                                            <TableRow>
+                                                <TableHead className="w-1/3 text-xs py-2">Header</TableHead>
+                                                <TableHead className="text-xs py-2">Value</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {Object.entries(trace.headers).map(([key, val]) => (
+                                                <TableRow key={key}>
+                                                    <TableCell className="font-mono text-[11px] py-1.5 font-semibold">
+                                                        {key}
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-[11px] py-1.5 select-text break-all whitespace-pre-wrap text-muted-foreground">
+                                                        {Array.isArray(val) ? val.join(', ') : String(val)}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-muted-foreground italic border rounded-md p-3 bg-muted/10 text-left">No HTTP headers captured</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </aside>
+        </>
+    );
+}
+
+function DetailRow({ label, value, font = false, className }: { label: string; value: string | null; font?: boolean; className?: string }) {
+    if (value === null || value === undefined || value === '') return null;
+    return (
+        <div className="flex justify-between items-baseline gap-4 py-0.5 text-sm">
+            <span className="text-muted-foreground text-xs">{label}</span>
+            <span className={cn("text-right font-medium", font && "font-mono text-xs", className)}>{value}</span>
+        </div>
     );
 }
 
@@ -604,6 +783,13 @@ function formatRelative(iso: string | null): string {
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
     return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function formatUtc(iso: string | null): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
 }
 
 const tooltipStyle = {

@@ -101,7 +101,7 @@ Route::middleware('auth')->group(function () {
                 ->name('commands.show');
             Route::get('/scheduled-tasks', [ScheduledTasksController::class, 'index'])->name('scheduled-tasks.index');
             Route::get('/scheduled-tasks/{task}', [ScheduledTasksController::class, 'show'])
-                ->where('task', '[A-Fa-f0-9]{40}')
+                ->where('task', '[A-Fa-f0-9]{32,40}')
                 ->name('scheduled-tasks.show');
             Route::get('/queries', [QueriesController::class, 'index'])->name('queries.index');
             Route::get('/queries/{query}', [QueriesController::class, 'show'])

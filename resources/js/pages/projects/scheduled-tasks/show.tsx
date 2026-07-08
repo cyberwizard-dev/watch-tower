@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
     Bar,
@@ -38,6 +38,7 @@ type Run = {
     duration_ms: number | null;
     exit_code: number | null;
     occurred_at: string | null;
+    output: string | null;
 };
 
 type Detail = {
@@ -69,6 +70,11 @@ type Props = {
 export default function ScheduledTasksShow({ detail, selectedRange }: Props) {
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [durationFilter, setDurationFilter] = useState<DurationFilter>('all');
+    const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+
+    const toggleExpand = (runId: string) => {
+        setExpandedRunId(expandedRunId === runId ? null : runId);
+    };
 
     const filteredRuns = useMemo(() => {
         return detail.runs.filter((r) => {
@@ -154,7 +160,7 @@ export default function ScheduledTasksShow({ detail, selectedRange }: Props) {
                                     <TableHead className="w-72">DATE</TableHead>
                                     <TableHead>STATUS</TableHead>
                                     <TableHead className="text-right">DURATION</TableHead>
-                                    <TableHead className="w-10" />
+                                    <TableHead className="w-12" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -165,24 +171,56 @@ export default function ScheduledTasksShow({ detail, selectedRange }: Props) {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    filteredRuns.map((run) => (
-                                        <TableRow key={run.id}>
-                                            <TableCell className="py-2.5 font-mono text-xs text-muted-foreground">
-                                                {formatUtc(run.occurred_at)}
-                                            </TableCell>
-                                            <TableCell className="py-2.5">
-                                                <ScheduledTaskStatusBadge status={run.status} />
-                                            </TableCell>
-                                            <TableCell className="py-2.5 text-right font-mono text-xs">
-                                                {formatMs(run.duration_ms)}
-                                            </TableCell>
-                                            <TableCell className="py-2.5 text-right">
-                                                <button type="button" className="inline-flex text-muted-foreground hover:text-foreground">
-                                                    <ExternalLink className="h-3.5 w-3.5" />
-                                                </button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
+                                    filteredRuns.map((run) => {
+                                        const isExpanded = expandedRunId === run.id;
+                                        return (
+                                            <>
+                                                <TableRow
+                                                    key={run.id}
+                                                    onClick={() => toggleExpand(run.id)}
+                                                    className={cn(
+                                                        "cursor-pointer hover:bg-muted/50 transition-colors",
+                                                        isExpanded && "bg-muted/40 hover:bg-muted/40"
+                                                    )}
+                                                >
+                                                    <TableCell className="py-2.5 font-mono text-xs text-muted-foreground">
+                                                        {formatUtc(run.occurred_at)}
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5">
+                                                        <ScheduledTaskStatusBadge status={run.status} />
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5 text-right font-mono text-xs">
+                                                        {formatMs(run.duration_ms)}
+                                                    </TableCell>
+                                                    <TableCell className="py-2.5 text-right pr-4">
+                                                        <ChevronRight className={cn(
+                                                            "h-4 w-4 inline text-muted-foreground/60 transition-transform",
+                                                            isExpanded && "rotate-90 text-foreground"
+                                                        )} />
+                                                    </TableCell>
+                                                </TableRow>
+                                                {isExpanded && (
+                                                    <TableRow className="bg-muted/5 hover:bg-transparent">
+                                                        <TableCell colSpan={4} className="p-4 border-t border-border/40">
+                                                            <div className="space-y-2 text-left">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Command Output</span>
+                                                                    {run.exit_code !== null && (
+                                                                        <span className="text-xs font-mono text-muted-foreground">
+                                                                            Exit Code: <span className={run.exit_code === 0 ? "text-emerald-500 font-bold" : "text-rose-500 font-bold"}>{run.exit_code}</span>
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <pre className="overflow-x-auto rounded-md border border-border bg-black/95 text-emerald-400 p-4 font-mono text-[11px] leading-relaxed max-h-80 overflow-y-auto select-text shadow-inner">
+                                                                    {run.output || 'No output recorded for this run.'}
+                                                                </pre>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </>
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
