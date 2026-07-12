@@ -102,7 +102,7 @@ class IssuesController extends Controller
         ]);
     }
 
-    public function show(Project $project, int $issue): Response
+    public function show(Project $project, string|int $issue): Response
     {
         /** @var ErrorGroup $group */
         $group = $project->errorGroups()
@@ -221,7 +221,7 @@ class IssuesController extends Controller
         ]);
     }
 
-    public function update(Project $project, int $issue, Request $request): RedirectResponse
+    public function update(Project $project, string|int $issue, Request $request): RedirectResponse
     {
         /** @var ErrorGroup $group */
         $group = $project->errorGroups()

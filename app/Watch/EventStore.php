@@ -135,11 +135,22 @@ class EventStore
                 ->first();
 
             if ($group) {
-                $group->forceFill([
+                $isRegression = $group->status === 'resolved';
+
+                $updateData = [
                     'total_count' => $group->total_count + 1,
                     'last_occurrence_at' => $occurredAt,
-                ])->save();
+                ];
+
+                if ($isRegression) {
+                    $updateData['status'] = 'unresolved';
+                    $updateData['resolved_at'] = null;
+                    $updateData['resolved_by_user_id'] = null;
+                }
+
+                $group->forceFill($updateData)->save();
             } else {
+                $isRegression = false;
                 $nextDisplayNumber = (int) (ErrorGroup::where('project_id', $project->id)->max('display_number') ?? 0) + 1;
 
                 $group = ErrorGroup::create([
@@ -157,7 +168,7 @@ class EventStore
                 ]);
             }
 
-            ErrorOccurrence::create([
+            $occurrence = new ErrorOccurrence([
                 'project_id' => $project->id,
                 'trace_id' => $trace?->id,
                 'error_group_id' => $group->id,
@@ -174,6 +185,12 @@ class EventStore
                 'context' => $data['context'] ?? null,
                 'occurred_at' => $occurredAt,
             ]);
+
+            if ($isRegression) {
+                $occurrence->is_regression_alert = true;
+            }
+
+            $occurrence->save();
 
             if ($trace) {
                 $trace->forceFill(['has_errors' => true])->save();
@@ -384,6 +401,7 @@ class EventStore
             'mailable_class' => (string) ($data['mailable_class'] ?? 'UnknownMail'),
             'mailer' => (string) ($data['mailer'] ?? 'smtp'),
             'subject' => (string) ($data['subject'] ?? ''),
+            'body' => $this->stringOrNull($data['body'] ?? null),
             'from_address' => (string) ($data['from_address'] ?? ''),
             'from_name' => (string) ($data['from_name'] ?? ''),
             'recipients_to' => $data['recipients_to'] ?? [],

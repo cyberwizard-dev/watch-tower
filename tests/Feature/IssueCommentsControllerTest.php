@@ -4,9 +4,11 @@ use App\Models\ErrorGroup;
 use App\Models\IssueComment;
 use App\Models\Project;
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 
 beforeEach(function () {
     $this->withMiddleware();
+    $this->withoutMiddleware(PreventRequestForgery::class);
     $this->user = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
     $this->project = Project::factory()->create();
     $this->group = ErrorGroup::factory()->create([

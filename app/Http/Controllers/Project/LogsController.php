@@ -14,7 +14,7 @@ class LogsController extends Controller
 {
     public function index(Project $project, Request $request, LogStats $stats): Response
     {
-        $range = TimeRange::fromLabel($request->string('range', '1h')->toString());
+        $range = TimeRange::fromLabel($request->string('range', '24h')->toString());
         $search = trim($request->string('search')->toString()) ?: null;
         $level = trim($request->string('level')->toString()) ?: null;
         $userName = trim($request->string('user')->toString()) ?: null;

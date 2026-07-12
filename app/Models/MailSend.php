@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'mailable_class',
     'mailer',
     'subject',
+    'body',
     'from_address',
     'from_name',
     'recipients_to',

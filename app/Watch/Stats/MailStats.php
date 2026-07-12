@@ -92,12 +92,24 @@ class MailStats
             ->groupBy('mailable_class')
             ->get();
 
+        $latestSends = MailSend::query()
+            ->where('project_id', $project->id)
+            ->whereIn('id', function ($query) use ($project) {
+                $query->selectRaw('MAX(id)')
+                    ->from('mail_sends')
+                    ->where('project_id', $project->id)
+                    ->groupBy('mailable_class');
+            })
+            ->get(['mailable_class', 'subject', 'from_name'])
+            ->keyBy('mailable_class');
+
         $durationsByClass = $this->durationsByClass($project, $range, $search);
 
         return $rows
-            ->map(function ($row) use ($durationsByClass) {
+            ->map(function ($row) use ($durationsByClass, $latestSends) {
                 $class = (string) $row->mailable_class;
                 $durations = $durationsByClass[$class] ?? [];
+                $latest = $latestSends->get($class);
 
                 return [
                     'mailable_class' => $class,
@@ -105,6 +117,8 @@ class MailStats
                     'count' => (int) $row->total,
                     'avg_ms' => $row->avg_ms !== null ? (float) $row->avg_ms : null,
                     'p95_ms' => $this->percentile($durations, 0.95),
+                    'last_subject' => $latest?->subject,
+                    'last_from_name' => $latest?->from_name,
                 ];
             })
             ->values()
@@ -146,6 +160,7 @@ class MailStats
             ->get([
                 'id',
                 'subject',
+                'body',
                 'mailer',
                 'recipients_count',
                 'attachments_count',
@@ -165,6 +180,7 @@ class MailStats
             ->map(fn (MailSend $row) => [
                 'id' => $row->id,
                 'subject' => $row->subject,
+                'body' => $row->body,
                 'mailer' => $row->mailer,
                 'recipients_count' => (int) $row->recipients_count,
                 'attachments_count' => (int) $row->attachments_count,

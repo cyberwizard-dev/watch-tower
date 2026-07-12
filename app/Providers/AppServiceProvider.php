@@ -75,10 +75,11 @@ class AppServiceProvider extends ServiceProvider
                     return;
                 }
 
-                // Only send alert on the very first occurrence of this exception to prevent duplicate notification spam
+                // Only send alert on the very first occurrence of this exception or on a regression to prevent duplicate notification spam
                 $isNewGroup = $occurrence->errorGroup && $occurrence->errorGroup->total_count === 1;
+                $isRegression = ! empty($occurrence->is_regression_alert);
 
-                if (! $isNewGroup) {
+                if (! $isNewGroup && ! $isRegression) {
                     return;
                 }
 
@@ -101,11 +102,13 @@ class AppServiceProvider extends ServiceProvider
                     $recipients = ['eminibest@gmail.com'];
                 }
 
-                $subject = '🚨 [WatchTower] New Exception in '.$project->name.' ('.$occurrence->environment.')';
+                $titleText = $isRegression ? 'Regression Exception Reopened' : 'New Exception Detected';
+                $emoji = $isRegression ? '🔄' : '🚨';
+                $subject = "{$emoji} [WatchTower] ".($isRegression ? 'Regression: ' : '')."Exception in {$project->name} ({$occurrence->environment})";
 
                 $body = "
                 <div style='font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;'>
-                    <h2 style='color: #dc2626; margin-top: 0;'>New Exception Detected</h2>
+                    <h2 style='color: #dc2626; margin-top: 0;'>{$titleText}</h2>
                     <p><strong>Project:</strong> {$project->name}</p>
                     <p><strong>Environment:</strong> ".e($occurrence->environment).'</p>
                     <p><strong>Exception Class:</strong> <code>'.e($occurrence->exception_class)."</code></p>

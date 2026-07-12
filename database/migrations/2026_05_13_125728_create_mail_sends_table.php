@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('mailable_class');
             $table->string('mailer', 50)->nullable();
             $table->string('subject')->nullable();
+            $table->longText('body')->nullable();
             $table->string('from_address')->nullable();
             $table->string('from_name')->nullable();
 

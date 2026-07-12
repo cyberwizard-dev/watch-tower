@@ -324,6 +324,7 @@ class NightwatchTranslator
                 'mailable_class' => (string) ($r['class'] ?? $r['mailable'] ?? 'UnknownMail'),
                 'mailer' => (string) ($r['mailer'] ?? 'smtp'),
                 'subject' => (string) ($r['subject'] ?? ''),
+                'body' => $this->stringOrNull($r['html'] ?? $r['body'] ?? $r['content'] ?? null),
                 'from_address' => (string) ($r['from'] ?? ''),
                 'from_name' => (string) ($r['from_name'] ?? ''),
                 'recipients_to' => $this->decodeMaybeJson($r['to'] ?? []),

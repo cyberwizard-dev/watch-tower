@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 
 class IssueCommentsController extends Controller
 {
-    public function store(Project $project, int $issue, Request $request): RedirectResponse
+    public function store(Project $project, string|int $issue, Request $request): RedirectResponse
     {
         /** @var ErrorGroup $group */
         $group = $project->errorGroups()
@@ -39,7 +39,7 @@ class IssueCommentsController extends Controller
         return back();
     }
 
-    public function destroy(Project $project, int $issue, IssueComment $comment, Request $request): RedirectResponse
+    public function destroy(Project $project, string|int $issue, IssueComment $comment, Request $request): RedirectResponse
     {
         /** @var ErrorGroup $group */
         $group = $project->errorGroups()

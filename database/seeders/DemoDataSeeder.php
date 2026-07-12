@@ -864,6 +864,7 @@ class DemoDataSeeder extends Seeder
                     'mailable_class' => $tpl['class'],
                     'mailer' => $tpl['mailer'],
                     'subject' => $tpl['subject'],
+                    'body' => $this->buildMockMailBody($tpl['class'], $tpl['subject']),
                     'from_address' => 'no-reply@acme.test',
                     'from_name' => 'Acme',
                     'recipients_to' => null,
@@ -1380,5 +1381,34 @@ class DemoDataSeeder extends Seeder
         }
 
         return $users;
+    }
+
+    private function buildMockMailBody(string $class, string $subject): string
+    {
+        $className = class_basename($class);
+
+        return "
+        <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px; background-color: #ffffff;'>
+            <div style='text-align: center; margin-bottom: 24px;'>
+                <span style='font-size: 24px; font-weight: bold; color: #10b981;'>✉️ Acme Inc.</span>
+            </div>
+            <h2 style='color: #111827; font-size: 20px; font-weight: 600; margin-top: 0;'>{$subject}</h2>
+            <p>Hello,</p>
+            <p>This is a simulated email sent by the mailable class <strong><code>{$class}</code></strong>.</p>
+            <div style='background-color: #f9fafb; border-left: 4px solid #10b981; padding: 12px; margin: 16px 0; border-radius: 4px;'>
+                <p style='margin: 0; font-size: 14px;'><strong>Subject:</strong> {$subject}</p>
+                <p style='margin: 4px 0 0 0; font-size: 14px;'><strong>Sender:</strong> no-reply@acme.test</p>
+            </div>
+            <p>If you have any questions or feedback, please contact support.</p>
+            <div style='margin-top: 24px; text-align: center;'>
+                <a href='#' style='display: inline-block; background-color: #10b981; color: #ffffff; padding: 10px 20px; border-radius: 6px; font-weight: bold; text-decoration: none;'>View Details</a>
+            </div>
+            <hr style='border: 0; border-top: 1px solid #f3f4f6; margin: 24px 0;' />
+            <p style='font-size: 12px; color: #6b7280; text-align: center; margin-bottom: 0;'>
+                &copy; ".date('Y')." Acme Inc. All rights reserved.<br />
+                Sent via <code>{$className}</code>
+            </p>
+        </div>
+        ";
     }
 }
